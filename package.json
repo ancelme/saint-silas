@@ -10,7 +10,7 @@
     "preview": "vite preview --config frontend/vite.config.ts",
     "clean": "node -e \"const fs=require('fs'); for (const path of ['frontend/dist','backend/server.js']) fs.rmSync(path,{recursive:true,force:true})\"",
     "lint": "tsc --noEmit"
-  },
+  }, 
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",
