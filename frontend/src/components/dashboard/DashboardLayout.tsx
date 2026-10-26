@@ -265,7 +265,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     { id: 'overview', label: t('dashOverview'), icon: LayoutDashboard, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'accountant', 'teacher', 'librarian', 'student', 'parent'] },
     { id: 'users', label: 'User & Role Mgmt', icon: Users, roles: ['owner', 'super_admin', 'admin'] },
     { id: 'admissions', label: t('dashAdmissions'), icon: FileText, roles: ['owner', 'super_admin', 'admin', 'head_teacher'] },
-    { id: 'students', label: t('dashStudents'), icon: GraduationCap, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher'] },
+    { id: 'students', label: t('dashStudents'), icon: GraduationCap, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'parent'] },
     { id: 'teachers', label: t('dashTeachers'), icon: BookOpen, roles: ['owner', 'super_admin', 'admin', 'head_teacher'] },
     { id: 'timetable', label: t('dashTimetable'), icon: Calendar, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'student', 'parent'] },
     { id: 'attendance', label: t('dashAttendance'), icon: CalendarCheck2, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'student', 'parent'] },
@@ -664,6 +664,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               onAddStudent={onAddStudent}
               onUpdateStudent={onUpdateStudent}
               onDeleteStudent={onDeleteStudent}
+              isParentView={currentRole === 'parent'}
             />
           )}
 

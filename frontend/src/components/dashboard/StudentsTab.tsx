@@ -26,12 +26,14 @@ interface StudentsTabProps {
   onAddStudent: (newStudent: Student) => Promise<void> | void;
   onUpdateStudent: (student: Student) => void;
   onDeleteStudent?: (id: string) => void;
+  isParentView?: boolean;
 }
 
 export const StudentsTab: React.FC<StudentsTabProps> = ({
   students,
   onAddStudent,
   onUpdateStudent,
+  isParentView = false,
 }) => {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
@@ -186,18 +188,22 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
             {t('dashStudents')}
           </h2>
           <p className="text-xs text-slate-500">
-            {students.length} pupils enrolled across Nursery, Lower Primary, and Upper Primary
+            {isParentView
+              ? `${students.length} linked ${students.length === 1 ? 'pupil' : 'pupils'}`
+              : `${students.length} pupils enrolled across Nursery, Lower Primary, and Upper Primary`}
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsEnrollModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs transition-all hover:scale-[1.01]"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Enroll New Pupil</span>
-        </button>
+        {!isParentView && (
+          <button
+            type="button"
+            onClick={() => setIsEnrollModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs transition-all hover:scale-[1.01]"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Enroll New Pupil</span>
+          </button>
+        )}
       </div>
 
       {/* Level Filter Tabs */}
@@ -288,7 +294,7 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
               <tr>
                 <th className="px-6 py-4">Pupil Info</th>
                 <th className="px-6 py-4">Level & Class</th>
-                <th className="px-6 py-4">Parent / Guardian</th>
+                {!isParentView && <th className="px-6 py-4">Parent / Guardian</th>}
                 <th className="px-6 py-4">Residence (Gatsibo)</th>
                 <th className="px-6 py-4">Attendance</th>
                 <th className="px-6 py-4">Feeding & Fees</th>
@@ -327,14 +333,16 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
                       {student.level} • {student.section}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="font-medium text-slate-800 dark:text-slate-200 block">
-                      {student.parentName}
-                    </span>
-                    <span className="text-[11px] text-slate-500 font-mono">
-                      {student.parentPhone}
-                    </span>
-                  </td>
+                  {!isParentView && (
+                    <td className="px-6 py-4">
+                      <span className="font-medium text-slate-800 dark:text-slate-200 block">
+                        {student.parentName}
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-mono">
+                        {student.parentPhone}
+                      </span>
+                    </td>
+                  )}
                   <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
                     <div className="flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -421,7 +429,7 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
               </div>
             </div>
 
-            <div className="space-y-2 text-xs">
+            {!isParentView && <div className="space-y-2 text-xs">
               <h4 className="font-bold text-slate-900 dark:text-white">Parent & Residential Details (Gatsibo)</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                 <div className="space-y-1">
@@ -437,7 +445,7 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
                   <p className="font-bold text-slate-800 dark:text-slate-200">{activeStudent.address}</p>
                 </div>
               </div>
-            </div>
+            </div>}
 
             <div className="flex justify-end pt-2">
               <button
@@ -453,7 +461,7 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
       )}
 
       {/* New Pupil Enrollment Modal */}
-      {isEnrollModalOpen && (
+      {!isParentView && isEnrollModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="relative w-full max-w-xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-8 space-y-6">
             <button

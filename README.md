@@ -36,9 +36,11 @@ An administrator or owner can create a parent account from **User & Role Mgmt**.
 Choose the **Parent / Guardian** role, then select the student or students to
 link before saving. The parent dashboard and student-related API results are
 limited to those linked students. Parents can view their linked students'
-attendance, grades, fees, and grade-specific timetable, and can contact school
-staff through chat. Dashboard navigation only shows modules available to the
-signed-in role; server routes enforce the same access rules.
+profiles, attendance, grades, fees, and grade-specific timetable, and can
+contact school staff through chat. The pupil directory is read-only for parents;
+they cannot enroll pupils or modify school records. Dashboard navigation only
+shows modules available to the signed-in role; server routes enforce the same
+access rules.
 
 ## Build for production
 
