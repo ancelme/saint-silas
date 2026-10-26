@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { db } from '../db/index';
 import { AuthRequest, recordAuditLog } from '../middleware/auth';
+import { isValidProfileImage } from '../utils/profileImage';
 
 export async function getStudents(req: AuthRequest, res: Response) {
   try {
@@ -111,14 +112,7 @@ export async function createStudent(req: AuthRequest, res: Response) {
       return res.status(400).json({ error: 'First name, last name, gender, date of birth, and grade are required' });
     }
 
-    const photoMatch = typeof photoUrl === 'string'
-      ? photoUrl.match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/)
-      : null;
-    const photoBytes = photoMatch ? Buffer.from(photoMatch[2], 'base64') : null;
-    if (!photoMatch || !photoBytes || photoBytes.toString('base64') !== photoMatch[2]) {
-      return res.status(400).json({ error: 'A pupil photo in JPEG, PNG, or WebP format is required' });
-    }
-    if (photoBytes.byteLength > 4 * 1024 * 1024) {
+    if (!isValidProfileImage(photoUrl, 4 * 1024 * 1024)) {
       return res.status(400).json({ error: 'The pupil photo must be 4 MB or smaller' });
     }
 

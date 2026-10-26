@@ -149,6 +149,20 @@ export interface FeeInvoice {
   items?: { description: string; amount: number }[];
 }
 
+export interface FeePaymentRequest {
+  id: string;
+  invoiceId: string;
+  studentId: string;
+  studentName: string;
+  grade: string;
+  parentName: string;
+  amount: number;
+  paymentMethod: 'MTN Mobile Money' | 'Airtel Money' | 'Bank Transfer' | 'Cash';
+  referenceNo: string;
+  phoneNumber: string;
+  submittedAt: string;
+}
+
 export interface Expense {
   id: string;
   title: string;
@@ -222,6 +236,7 @@ export interface AdmissionApplication {
   parentName: string;
   parentPhone: string;
   parentEmail: string;
+  photoUrl?: string;
   district: string;
   sector: string;
   cell: string;

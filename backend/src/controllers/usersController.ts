@@ -2,6 +2,7 @@ import { Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../db/index';
 import { AuthRequest, recordAuditLog } from '../middleware/auth';
+import { isValidProfileImage } from '../utils/profileImage';
 
 const PERMITTED_ROLES = ['admin', 'head_teacher', 'teacher', 'accountant', 'librarian', 'parent', 'student'];
 const PRIVILEGED_STAFF_ROLES = ['admin', 'head_teacher', 'teacher', 'accountant', 'librarian', 'parent', 'student'];
@@ -45,6 +46,9 @@ export async function createStaffUser(req: AuthRequest, res: Response) {
     if (!fullName || !email || !username || !password || !role) {
       return res.status(400).json({ error: 'Full name, email, username, password, and role are required' });
     }
+    if (!isValidProfileImage(avatar)) {
+      return res.status(400).json({ error: 'A JPEG, PNG, or WebP profile photo of 5 MB or smaller is required' });
+    }
 
     if (!PERMITTED_ROLES.includes(role)) {
       return res.status(400).json({
@@ -81,7 +85,7 @@ export async function createStaffUser(req: AuthRequest, res: Response) {
     const passwordHash = await bcrypt.hash(password, 10);
     const userId = `usr-${role}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    const avatarUrl = avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
+    const avatarUrl = avatar;
 
     // Account created by admin is immediately ACTIVE with direct right to login to their dashboard
     await db.query(

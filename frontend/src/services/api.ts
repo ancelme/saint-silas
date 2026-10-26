@@ -9,6 +9,7 @@ import {
   GradeEntry,
   Announcement,
   AdmissionApplication,
+  FeePaymentRequest,
   SchoolEvent,
   TimetableSlot,
   User,
@@ -164,6 +165,7 @@ export async function setupInitialOwner(payload: {
   username: string;
   password: string;
   phone?: string;
+  avatar: string;
 }) {
   const data = await request<{ message: string; token: string; mustChangePassword: boolean; user: User }>('/api/setup/owner', {
     method: 'POST',
@@ -294,7 +296,7 @@ export async function createStaffUser(payload: {
   phone?: string;
   specialization?: string;
   department?: string;
-  avatar?: string;
+  avatar: string;
   studentIds?: string[];
 }) {
   return request<{ message: string; user: User }>('/api/users/staff', {
@@ -472,6 +474,41 @@ export async function recordPayment(payload: {
   }>('/api/fees/payment', {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+export async function submitParentPaymentRequest(payload: {
+  invoiceId: string;
+  amount: number;
+  paymentMethod: 'MTN Mobile Money' | 'Airtel Money' | 'Bank Transfer' | 'Cash';
+  referenceNo?: string;
+  phoneNumber?: string;
+}) {
+  return request<{
+    message: string;
+    paymentRequestId: string;
+    status: 'Pending Verification';
+  }>('/api/fees/payment-requests', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchPaymentRequests() {
+  return request<FeePaymentRequest[]>('/api/fees/payment-requests');
+}
+
+export async function reviewPaymentRequest(id: string, decision: 'Verified' | 'Rejected') {
+  return request<{
+    message: string;
+    status: 'Completed' | 'Rejected';
+    invoiceId?: string;
+    amountPaid?: number;
+    newBalance?: number;
+    feeStatus?: FeeInvoice['status'];
+  }>(`/api/fees/payment-requests/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ decision }),
   });
 }
 

@@ -156,13 +156,13 @@ export const UserManagementTab: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      setToastMsg({ type: 'error', text: 'Please select a valid image file (PNG, JPG, WEBP)' });
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setToastMsg({ type: 'error', text: 'Please select a JPEG, PNG, or WEBP image' });
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      setToastMsg({ type: 'error', text: 'Image size must be less than 5MB' });
+      setToastMsg({ type: 'error', text: 'Image size must be 5 MB or smaller' });
       return;
     }
 
@@ -182,8 +182,8 @@ export const UserManagementTab: React.FC = () => {
 
   const handleCreateStaffSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formFullName || !formEmail || !formUsername || !formPassword) {
-      setToastMsg({ type: 'error', text: 'Please fill in all required fields' });
+    if (!formFullName || !formEmail || !formUsername || !formPassword || !formAvatar) {
+      setToastMsg({ type: 'error', text: 'Please fill in all required fields and select a profile photo' });
       return;
     }
     if (formRole === 'parent' && selectedStudentIds.length === 0) {
@@ -200,7 +200,7 @@ export const UserManagementTab: React.FC = () => {
         password: formPassword,
         role: formRole,
         phone: formPhone,
-        avatar: formAvatar || undefined,
+        avatar: formAvatar,
         studentIds: formRole === 'parent' ? selectedStudentIds : undefined,
       });
 
@@ -705,12 +705,12 @@ export const UserManagementTab: React.FC = () => {
                     <input
                       id="staff-avatar-upload"
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp"
                       onChange={e => handleDeviceImageUpload(e, false)}
                       className="hidden"
                     />
                     <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                      {formAvatarFileName ? `Selected: ${formAvatarFileName}` : 'PNG, JPG, WEBP (Max 5MB)'}
+                      {formAvatarFileName ? `Selected: ${formAvatarFileName}` : 'Profile photo required: JPEG, PNG, or WEBP (max 5 MB)'}
                     </p>
                   </div>
                 </div>

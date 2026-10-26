@@ -30,7 +30,7 @@ interface AuthContextType {
     recoveryEmail: string;
     recoveryPhone: string;
   }) => Promise<{ success: boolean; error?: string }>;
-  setupOwner: (payload: { fullName: string; email: string; username: string; password: string; phone?: string; avatar?: string }) => Promise<{ success: boolean; error?: string }>;
+  setupOwner: (payload: { fullName: string; email: string; username: string; password: string; phone?: string; avatar: string }) => Promise<{ success: boolean; error?: string }>;
   updateUserAvatar: (avatarUrl: string) => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
   changeAccountPassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
@@ -140,7 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     username: string;
     password: string;
     phone?: string;
-    avatar?: string;
+    avatar: string;
   }): Promise<{ success: boolean; error?: string }> => {
     try {
       const res = await setupInitialOwner(payload);

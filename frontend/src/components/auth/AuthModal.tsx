@@ -15,7 +15,9 @@ import {
   ArrowRight,
   ShieldCheck,
   Building,
-  Loader2
+  Loader2,
+  Camera,
+  Upload
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -45,6 +47,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
+  const [ownerAvatar, setOwnerAvatar] = useState('');
+  const [ownerAvatarName, setOwnerAvatarName] = useState('');
 
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -92,8 +96,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!fullName || !email || !username || !password) {
-      setErrorMsg('All fields are required to initialize the School Owner account.');
+    if (!fullName || !email || !username || !password || !ownerAvatar) {
+      setErrorMsg('All fields, including a profile photo, are required to initialize the School Owner account.');
       return;
     }
 
@@ -109,12 +113,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       username,
       password,
       phone,
+      avatar: ownerAvatar,
     });
     setIsSubmitting(false);
 
     if (res.success) {
       localStorage.setItem('st_silas_last_identifier', username.trim());
-      setSuccessMsg('Owner account initialized and secured in MySQL database! Entering dashboard...');
+      setSuccessMsg('Owner account initialized and secured in the school database! Entering dashboard...');
       setTimeout(() => {
         onSuccess();
         onClose();
@@ -122,6 +127,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     } else {
       setErrorMsg(res.error || 'Failed to setup owner account.');
     }
+  };
+
+  const handleOwnerPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setErrorMsg('Choose a JPEG, PNG, or WebP profile photo.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg('Profile photos must be 5 MB or smaller.');
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setOwnerAvatar(reader.result);
+        setOwnerAvatarName(file.name);
+        setErrorMsg('');
+      }
+    };
+    reader.onerror = () => setErrorMsg('The selected profile photo could not be read.');
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -359,6 +389,37 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     placeholder="+250 788 765 432"
                     className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Owner Profile Photo *
+                  </label>
+                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 p-3">
+                    {ownerAvatar ? (
+                      <img src={ownerAvatar} alt="Owner profile preview" className="w-12 h-12 rounded-xl object-cover" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 flex items-center justify-center">
+                        <Camera className="w-5 h-5" />
+                      </div>
+                    )}
+                    <div>
+                      <label htmlFor="owner-profile-photo" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold cursor-pointer">
+                        <Upload className="w-3.5 h-3.5" />
+                        {ownerAvatar ? 'Change Photo' : 'Choose Photo'}
+                      </label>
+                      <input
+                        id="owner-profile-photo"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handleOwnerPhotoChange}
+                        className="sr-only"
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        {ownerAvatarName || 'JPEG, PNG, or WebP; maximum 5 MB'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div>

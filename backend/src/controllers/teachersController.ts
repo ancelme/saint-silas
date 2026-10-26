@@ -2,6 +2,7 @@ import { Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../db/index';
 import { AuthRequest, recordAuditLog } from '../middleware/auth';
+import { isValidProfileImage } from '../utils/profileImage';
 
 export async function getTeachers(req: AuthRequest, res: Response) {
   try {
@@ -39,10 +40,13 @@ export async function getTeachers(req: AuthRequest, res: Response) {
 
 export async function createTeacher(req: AuthRequest, res: Response) {
   try {
-    const { name, email, phone, specialization, qualification, assignedGrades, password } = req.body;
+    const { name, email, phone, specialization, qualification, assignedGrades, password, avatar } = req.body;
 
     if (!name || !email) {
       return res.status(400).json({ error: 'Name and email are required' });
+    }
+    if (!isValidProfileImage(avatar)) {
+      return res.status(400).json({ error: 'A JPEG, PNG, or WebP profile photo of 5 MB or smaller is required' });
     }
 
     const cleanEmail = email.toLowerCase().trim();
@@ -54,16 +58,15 @@ export async function createTeacher(req: AuthRequest, res: Response) {
 
     if (existing.rows.length > 0) {
       userId = existing.rows[0].id;
+      await db.query(`UPDATE users SET avatar_url = ? WHERE id = ?`, [avatar, userId]);
     } else {
       userId = `usr-${Date.now()}`;
       const defaultPassword = password || 'StSilas2026!';
       const passwordHash = await bcrypt.hash(defaultPassword, 10);
-      const defaultAvatar = 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80';
-
       await db.query(
         `INSERT INTO users (id, username, email, password_hash, full_name, role, phone, avatar_url, is_active, email_verified)
          VALUES (?, ?, ?, ?, ?, 'teacher', ?, ?, 1, 1)`,
-        [userId, cleanUsername, cleanEmail, passwordHash, name.trim(), phone || '', defaultAvatar]
+        [userId, cleanUsername, cleanEmail, passwordHash, name.trim(), phone || '', avatar]
       );
     }
 
@@ -102,6 +105,7 @@ export async function createTeacher(req: AuthRequest, res: Response) {
         name,
         email: cleanEmail,
         phone,
+        avatar,
         specialization: specs,
         qualification: qualification || 'Bachelor of Education (REB Certified)',
         status: 'Active',

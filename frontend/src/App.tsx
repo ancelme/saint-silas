@@ -218,13 +218,11 @@ const MainApp: React.FC = () => {
       const res = await apiCreateTeacher(newTeacher);
       if (res && res.teacher) {
         setTeachers(prev => [res.teacher, ...prev]);
-      } else {
-        setTeachers(prev => [newTeacher, ...prev]);
       }
       notifySuccess(`Teacher ${newTeacher.name} added successfully.`);
     } catch (e) {
       console.error('Failed to create teacher via API:', e);
-      setTeachers(prev => [newTeacher, ...prev]);
+      throw e;
     }
   };
 
@@ -427,7 +425,7 @@ const MainApp: React.FC = () => {
       notifySuccess(`Admission application for ${newApp.applicantName} submitted successfully.`);
     } catch (e) {
       console.error('Failed to submit admission via API:', e);
-      setAdmissions(prev => [newApp, ...prev]);
+      throw e;
     }
   };
 

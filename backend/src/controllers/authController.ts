@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../db/index';
 import { generateToken, AuthRequest, recordAuditLog } from '../middleware/auth';
+import { isValidProfileImage } from '../utils/profileImage';
 
 const PRIVILEGED_ROLES = ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'accountant', 'librarian'];
 
@@ -33,6 +34,10 @@ export async function setupInitialOwner(req: Request, res: Response) {
 
     const { fullName, email, username, password, phone, avatar } = req.body;
 
+    if (!isValidProfileImage(avatar)) {
+      return res.status(400).json({ error: 'A JPEG, PNG, or WebP profile photo of 5 MB or smaller is required' });
+    }
+
     if (!password || password.length < 6) {
       return res.status(400).json({ error: 'Temporary password must be at least 6 characters' });
     }
@@ -41,7 +46,7 @@ export async function setupInitialOwner(req: Request, res: Response) {
     const cleanUsername = (username && username.trim() ? username.trim() : 'innocent').toLowerCase();
     const cleanEmail = (email && email.trim() ? email.trim() : `${cleanUsername}@st-silas.rw`).toLowerCase();
     const cleanFullName = fullName && fullName.trim() ? fullName.trim() : 'Innocent Ndayishimiye (School Owner)';
-    const avatarUrl = avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
+    const avatarUrl = avatar;
 
     const passwordHash = await bcrypt.hash(password, 10);
     const userId = `usr-owner-${Date.now()}`;
@@ -95,7 +100,7 @@ export async function setupInitialOwner(req: Request, res: Response) {
         status: 'PENDING_FIRST_LOGIN',
         mustChangePassword: true,
         phone: phone || '+250 788 765 432',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+        avatar: avatarUrl
       }
     });
   } catch (error: any) {

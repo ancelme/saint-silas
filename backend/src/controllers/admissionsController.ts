@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { db } from '../db/index';
 import { AuthRequest, recordAuditLog } from '../middleware/auth';
 import { sendAdmissionFeedbackEmail, sendAdmissionReceivedEmail } from '../services/emailService';
+import { isValidProfileImage } from '../utils/profileImage';
 
 export async function getAdmissions(req: AuthRequest, res: Response) {
   try {
@@ -31,6 +32,7 @@ export async function getAdmissions(req: AuthRequest, res: Response) {
       parentName: row.parent_name,
       parentPhone: row.parent_phone,
       parentEmail: row.parent_email || '',
+      photoUrl: row.photo_url || undefined,
       district: row.district || 'Gatsibo',
       sector: row.sector || 'Kabarore',
       cell: row.cell || 'Simbwa',
@@ -67,6 +69,7 @@ export async function submitAdmission(req: AuthRequest, res: Response) {
       parentName,
       parentPhone,
       parentEmail,
+      photoUrl,
       district,
       sector,
       cell,
@@ -77,6 +80,9 @@ export async function submitAdmission(req: AuthRequest, res: Response) {
     if (!applicantName || !gender || !dob || !applyingGrade || !parentName || !parentPhone) {
       return res.status(400).json({ error: 'Applicant name, gender, birth date, grade, parent name, and phone are required.' });
     }
+    if (!isValidProfileImage(photoUrl, 4 * 1024 * 1024)) {
+      return res.status(400).json({ error: 'A JPEG, PNG, or WebP pupil photo of 4 MB or smaller is required' });
+    }
 
     const admissionId = `adm-${Date.now()}`;
     const calculatedLevel = level || (applyingGrade.includes('Nursery') ? 'Nursery' : ['Primary 1', 'Primary 2', 'Primary 3'].includes(applyingGrade) ? 'Lower Primary' : 'Upper Primary');
@@ -85,9 +91,9 @@ export async function submitAdmission(req: AuthRequest, res: Response) {
     await db.query(
       `INSERT INTO admissions (
         id, user_id, applicant_name, gender, dob, applying_grade, level,
-        parent_name, parent_phone, parent_email, district, sector, cell, village,
+        parent_name, parent_phone, parent_email, photo_url, district, sector, cell, village,
         previous_school, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', CURRENT_TIMESTAMP)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', CURRENT_TIMESTAMP)`,
       [
         admissionId,
         req.user.id,
@@ -99,6 +105,7 @@ export async function submitAdmission(req: AuthRequest, res: Response) {
         parentName.trim(),
         parentPhone.trim(),
         targetEmail,
+        photoUrl,
         district || 'Gatsibo',
         sector || 'Kabarore',
         cell || 'Simbwa',
@@ -175,6 +182,9 @@ export async function answerAdmission(req: AuthRequest, res: Response) {
     }
 
     const adm = admRes.rows[0];
+    if (decision === 'Approved' && !isValidProfileImage(adm.photo_url, 4 * 1024 * 1024)) {
+      return res.status(400).json({ error: 'This application has no valid pupil photo. Submit a new application with a JPEG, PNG, or WebP photo before approval.' });
+    }
     const responder = `${req.user?.fullName || 'Office of Head Teacher'} (${req.user?.role || 'admin'})`;
     const today = new Date().toISOString().split('T')[0];
     const streamToAssign = assignedStream || adm.assigned_stream || 'Alpha';
@@ -237,9 +247,7 @@ export async function answerAdmission(req: AuthRequest, res: Response) {
             streamToAssign,
             today,
             `${adm.village} Village, ${adm.cell} Cell`,
-            adm.gender === 'F'
-              ? 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=300&q=80'
-              : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80'
+            adm.photo_url
           ]
         );
       }
@@ -370,4 +378,3 @@ export async function deleteAdmission(req: AuthRequest, res: Response) {
     return res.status(500).json({ error: error.message || 'Failed to delete admission' });
   }
 }
-

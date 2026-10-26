@@ -20,12 +20,14 @@ import {
   Sparkles,
   Phone,
   RotateCcw,
-  Mail
+  Mail,
+  Camera,
+  Upload
 } from 'lucide-react';
 
 interface AdmissionsProps {
   onOpenAuth: (tab?: 'login') => void;
-  onNewAdmission?: (application: AdmissionApplication) => void;
+  onNewAdmission: (application: AdmissionApplication) => Promise<void> | void;
 }
 
 export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmission }) => {
@@ -33,6 +35,10 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
   const { user, isAuthenticated } = useAuth();
   const [inquirySubmitted, setInquirySubmitted] = useState(false);
   const [submittedTicket, setSubmittedTicket] = useState('');
+  const [pupilPhoto, setPupilPhoto] = useState('');
+  const [pupilPhotoName, setPupilPhotoName] = useState('');
+  const [formError, setFormError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
     studentName: '',
@@ -56,14 +62,18 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
     }
   }, [user]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError('');
     if (!isAuthenticated) {
       onOpenAuth('login');
       return;
     }
 
-    if (!form.studentName || !form.phone) return;
+    if (!form.studentName || !form.phone || !pupilPhoto) {
+      setFormError('Complete the required details and choose a pupil photo.');
+      return;
+    }
 
     const gradeLevel = form.grade.includes('Nursery')
       ? 'Nursery'
@@ -76,6 +86,7 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
     const newApp: AdmissionApplication = {
       id: `adm-${Date.now()}`,
       applicantName: form.studentName,
+      photoUrl: pupilPhoto,
       gender: form.gender,
       dob: '2020-05-14',
       applyingGrade: form.grade,
@@ -95,9 +106,15 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
       notes: `Applied online through parent portal by ${user?.name || 'Parent'}. Village: ${form.village}`,
     };
 
-    if (onNewAdmission) {
-      onNewAdmission(newApp);
+    setIsSubmitting(true);
+    try {
+      await onNewAdmission(newApp);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'The application could not be submitted. Please try again.');
+      setIsSubmitting(false);
+      return;
     }
+    setIsSubmitting(false);
 
     // Celebration Confetti
     confetti({
@@ -111,8 +128,36 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
     setInquirySubmitted(true);
   };
 
+  const handlePupilPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setFormError('Choose a JPEG, PNG, or WebP pupil photo.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setFormError('Pupil photos must be 4 MB or smaller.');
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setPupilPhoto(reader.result);
+        setPupilPhotoName(file.name);
+        setFormError('');
+      }
+    };
+    reader.onerror = () => setFormError('The selected pupil photo could not be read.');
+    reader.readAsDataURL(file);
+  };
+
   const handleResetForm = () => {
     setInquirySubmitted(false);
+    setPupilPhoto('');
+    setPupilPhotoName('');
+    setFormError('');
     setForm({
       studentName: '',
       gender: 'F',
@@ -401,6 +446,11 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
           ) : (
             /* Authenticated Online Admission Form */
             <form onSubmit={handleSubmit} className="space-y-4">
+              {formError && (
+                <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                  {formError}
+                </p>
+              )}
               {/* Verified Parent Indicator */}
               <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
@@ -418,6 +468,35 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-600 text-white font-bold shrink-0">
                   Verified
                 </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Pupil Profile Photo *
+                </label>
+                <div className="flex items-center gap-3">
+                  {pupilPhoto ? (
+                    <img src={pupilPhoto} alt="Pupil profile preview" className="w-12 h-12 rounded-xl object-cover" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                      <Camera className="w-5 h-5" />
+                    </div>
+                  )}
+                  <div>
+                    <label htmlFor="public-admission-photo" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold cursor-pointer">
+                      <Upload className="w-3.5 h-3.5" />
+                      {pupilPhoto ? 'Change Photo' : 'Choose Photo'}
+                    </label>
+                    <input
+                      id="public-admission-photo"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handlePupilPhotoChange}
+                      className="sr-only"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">{pupilPhotoName || 'JPEG, PNG, or WebP; maximum 4 MB'}</p>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -545,10 +624,10 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
               <button
                 type="submit"
                 id="submit-admission-app-btn"
-                className="w-full py-3 rounded-xl text-xs sm:text-sm font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-md shadow-emerald-700/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                disabled={isSubmitting}
+                className="w-full py-3 rounded-xl text-xs sm:text-sm font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-md shadow-emerald-700/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{t('submitApplicationBtn')}</span>
+                {isSubmitting ? <span>Submitting...</span> : <><CheckCircle2 className="w-4 h-4" /><span>{t('submitApplicationBtn')}</span></>}
               </button>
             </form>
           )}

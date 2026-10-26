@@ -42,7 +42,10 @@ import {
   createFeeInvoice,
   updateFeeInvoice,
   deleteFeeInvoice,
-  recordPayment
+  recordPayment,
+  submitParentPaymentRequest,
+  getPaymentRequests,
+  reviewPaymentRequest
 } from '../controllers/feesController';
 import {
   getExpenses,
@@ -172,6 +175,9 @@ router.post('/fees', authenticateToken, requireRole('accountant', 'admin'), crea
 router.put('/fees/:id', authenticateToken, requireRole('accountant', 'admin'), updateFeeInvoice);
 router.delete('/fees/:id', authenticateToken, requireRole('accountant', 'admin'), deleteFeeInvoice);
 router.post('/fees/payment', authenticateToken, requireRole('accountant', 'admin'), recordPayment);
+router.post('/fees/payment-requests', authenticateToken, requireRole('parent'), submitParentPaymentRequest);
+router.get('/fees/payment-requests', authenticateToken, requireRole('accountant', 'admin'), getPaymentRequests);
+router.put('/fees/payment-requests/:id', authenticateToken, requireRole('accountant', 'admin'), reviewPaymentRequest);
 router.get('/expenses', authenticateToken, requireRole('accountant', 'admin'), getExpenses);
 router.post('/expenses', authenticateToken, requireRole('accountant', 'admin'), createExpense);
 

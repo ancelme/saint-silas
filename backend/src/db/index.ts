@@ -413,6 +413,7 @@ class DatabaseManager {
         parent_name VARCHAR(150) NOT NULL,
         parent_phone VARCHAR(50) NOT NULL,
         parent_email VARCHAR(191),
+        photo_url LONGTEXT,
         district VARCHAR(100) DEFAULT 'Gatsibo',
         sector VARCHAR(100) DEFAULT 'Kabarore',
         cell VARCHAR(100) DEFAULT 'Simbwa',
@@ -490,6 +491,16 @@ class DatabaseManager {
       if (!existingUserColumns.has(column)) {
         await this.query(`ALTER TABLE users ADD COLUMN ${column} ${definition}`);
       }
+    }
+
+    const admissionColumns = this.engine === 'mysql'
+      ? await this.query<{ name: string }>(
+        `SELECT COLUMN_NAME AS name FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
+        ['admissions'],
+      )
+      : await this.query<{ name: string }>(`PRAGMA table_info(admissions)`);
+    if (!admissionColumns.rows.some(({ name }) => name === 'photo_url')) {
+      await this.query(`ALTER TABLE admissions ADD COLUMN photo_url LONGTEXT`);
     }
 
     const messageColumns = this.engine === 'mysql'

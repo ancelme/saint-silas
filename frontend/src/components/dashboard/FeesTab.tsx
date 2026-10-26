@@ -1,23 +1,26 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
-import { FeeInvoice } from '../../types';
+import { FeeInvoice, FeePaymentRequest, Student } from '../../types';
 import { Wallet, CheckCircle2, X } from 'lucide-react';
+import { fetchPaymentRequests, reviewPaymentRequest, submitParentPaymentRequest } from '../../services/api';
 
 type PaymentMethod = 'MTN Mobile Money' | 'Airtel Money' | 'Bank Transfer' | 'Cash';
 
 interface FeesTabProps {
   fees: FeeInvoice[];
-  students?: any[];
+  students?: Student[];
   onRecordPayment: (invoiceId: string, amount: number, method: PaymentMethod, referenceNo?: string, phoneNumber?: string) => Promise<string>;
   onAddFeeInvoice?: (invoice: FeeInvoice) => void;
   onUpdateFeeInvoice?: (invoice: FeeInvoice) => void;
   onDeleteFeeInvoice?: (id: string) => void;
 }
 
-export const FeesTab: React.FC<FeesTabProps> = ({ fees, onRecordPayment }) => {
+export const FeesTab: React.FC<FeesTabProps> = ({ fees, students = [], onRecordPayment }) => {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const canRecordPayments = user?.role === 'admin' || user?.role === 'accountant';
+  const isParent = user?.role === 'parent';
   const [activeInvoice, setActiveInvoice] = useState<FeeInvoice | null>(null);
   const [payMethod, setPayMethod] = useState<PaymentMethod>('MTN Mobile Money');
   const [payerPhone, setPayerPhone] = useState('');
@@ -33,10 +36,44 @@ export const FeesTab: React.FC<FeesTabProps> = ({ fees, onRecordPayment }) => {
   } | null>(null);
   const [paymentError, setPaymentError] = useState('');
   const [isRecordingPayment, setIsRecordingPayment] = useState(false);
-  const canRecordPayments = user?.role === 'admin' || user?.role === 'accountant';
+  const [selectedParentStudent, setSelectedParentStudent] = useState('');
+  const [selectedParentInvoice, setSelectedParentInvoice] = useState('');
+  const [parentPayMethod, setParentPayMethod] = useState<PaymentMethod>('MTN Mobile Money');
+  const [parentPayAmount, setParentPayAmount] = useState(0);
+  const [parentPaymentReference, setParentPaymentReference] = useState('');
+  const [parentPayerPhone, setParentPayerPhone] = useState('');
+  const [parentRequestError, setParentRequestError] = useState('');
+  const [parentRequestMessage, setParentRequestMessage] = useState('');
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [paymentRequests, setPaymentRequests] = useState<FeePaymentRequest[]>([]);
+  const [paymentRequestError, setPaymentRequestError] = useState('');
+  const [reviewingRequestId, setReviewingRequestId] = useState('');
+  const [feeOverrides, setFeeOverrides] = useState<Record<string, Partial<FeeInvoice>>>({});
 
-  const totalBilled = fees.reduce((acc, f) => acc + f.amountTotal, 0);
-  const totalPaid = fees.reduce((acc, f) => acc + f.amountPaid, 0);
+  const visibleFees = fees.map(invoice => ({ ...invoice, ...feeOverrides[invoice.id] }));
+  const parentInvoices = visibleFees.filter(invoice =>
+    invoice.studentId === selectedParentStudent &&
+    (invoice.balance ?? (invoice.amountTotal - invoice.amountPaid)) > 0
+  );
+  const currentParentInvoice = parentInvoices.find(invoice => invoice.id === selectedParentInvoice);
+
+  useEffect(() => {
+    if (!canRecordPayments) return;
+    let isCurrent = true;
+    fetchPaymentRequests()
+      .then(requests => {
+        if (isCurrent) setPaymentRequests(requests);
+      })
+      .catch(error => {
+        if (isCurrent) setPaymentRequestError(error instanceof Error ? error.message : 'Failed to load payment requests.');
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [canRecordPayments]);
+
+  const totalBilled = visibleFees.reduce((acc, f) => acc + f.amountTotal, 0);
+  const totalPaid = visibleFees.reduce((acc, f) => acc + f.amountPaid, 0);
   const totalBalance = totalBilled - totalPaid;
 
   const formatRWF = (n: number) => {
@@ -53,6 +90,55 @@ export const FeesTab: React.FC<FeesTabProps> = ({ fees, onRecordPayment }) => {
     setPaymentError('');
     setPaymentReference('');
     setPayerPhone('');
+  };
+
+  const handleParentPaymentRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentParentInvoice || parentPayAmount <= 0 || isSubmittingRequest) return;
+    setIsSubmittingRequest(true);
+    setParentRequestError('');
+    setParentRequestMessage('');
+    try {
+      const result = await submitParentPaymentRequest({
+        invoiceId: currentParentInvoice.id,
+        amount: parentPayAmount,
+        paymentMethod: parentPayMethod,
+        referenceNo: parentPaymentReference.trim() || undefined,
+        phoneNumber: parentPayerPhone.trim() || undefined,
+      });
+      setParentRequestMessage(result.message);
+      setParentPaymentReference('');
+      setParentPayerPhone('');
+      setParentPayAmount(0);
+    } catch (error) {
+      setParentRequestError(error instanceof Error ? error.message : 'Unable to submit payment details.');
+    } finally {
+      setIsSubmittingRequest(false);
+    }
+  };
+
+  const handleReviewPaymentRequest = async (request: FeePaymentRequest, decision: 'Verified' | 'Rejected') => {
+    setReviewingRequestId(request.id);
+    setPaymentRequestError('');
+    try {
+      const result = await reviewPaymentRequest(request.id, decision);
+      setPaymentRequests(previous => previous.filter(item => item.id !== request.id));
+      if (decision === 'Verified' && result.invoiceId && result.amountPaid !== undefined && result.newBalance !== undefined && result.feeStatus) {
+        setFeeOverrides(previous => ({
+          ...previous,
+          [result.invoiceId as string]: {
+            amountPaid: result.amountPaid,
+            balance: result.newBalance,
+            status: result.feeStatus,
+            paymentMethod: request.paymentMethod,
+          },
+        }));
+      }
+    } catch (error) {
+      setPaymentRequestError(error instanceof Error ? error.message : 'Unable to review payment request.');
+    } finally {
+      setReviewingRequestId('');
+    }
   };
 
   const handleProcessPayment = async (e: React.FormEvent) => {
@@ -98,6 +184,170 @@ export const FeesTab: React.FC<FeesTabProps> = ({ fees, onRecordPayment }) => {
         </div>
       </div>
 
+      {isParent && (
+        <section className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5 space-y-4">
+          <div>
+            <h3 className="font-bold text-slate-900 dark:text-white">Submit Payment Details</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Select the pupil and invoice this payment is for. The school must verify the payment before the balance changes.
+            </p>
+          </div>
+          {parentRequestMessage && (
+            <p role="status" className="rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{parentRequestMessage}</p>
+          )}
+          {parentRequestError && (
+            <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">{parentRequestError}</p>
+          )}
+          <form onSubmit={handleParentPaymentRequest} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Pupil
+              <select
+                required
+                value={selectedParentStudent}
+                onChange={e => {
+                  const studentId = e.target.value;
+                  setSelectedParentStudent(studentId);
+                  setSelectedParentInvoice(visibleFees.find(invoice =>
+                    invoice.studentId === studentId &&
+                    (invoice.balance ?? invoice.amountTotal - invoice.amountPaid) > 0
+                  )?.id || '');
+                  setParentRequestMessage('');
+                  setParentRequestError('');
+                }}
+                className="mt-1 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white"
+              >
+                <option value="">Select your pupil</option>
+                {students.map(student => (
+                  <option key={student.id} value={student.id}>{student.firstName} {student.lastName} — {student.grade}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Fee invoice
+              <select
+                required
+                value={selectedParentInvoice}
+                onChange={e => {
+                  setSelectedParentInvoice(e.target.value);
+                  setParentPayAmount(0);
+                  setParentRequestMessage('');
+                  setParentRequestError('');
+                }}
+                className="mt-1 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white"
+              >
+                <option value="">Select an invoice</option>
+                {parentInvoices.map(invoice => (
+                  <option key={invoice.id} value={invoice.id}>
+                    {invoice.invoiceNumber || invoice.invoiceNo || invoice.id} — Balance {formatRWF(invoice.balance ?? invoice.amountTotal - invoice.amountPaid)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {currentParentInvoice && (
+              <>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Payment method
+                  <select
+                    value={parentPayMethod}
+                    onChange={e => setParentPayMethod(e.target.value as PaymentMethod)}
+                    className="mt-1 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white"
+                  >
+                    <option>MTN Mobile Money</option>
+                    <option>Airtel Money</option>
+                    <option>Bank Transfer</option>
+                    <option>Cash</option>
+                  </select>
+                </label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Amount paid (RWF)
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    max={currentParentInvoice.balance ?? currentParentInvoice.amountTotal - currentParentInvoice.amountPaid}
+                    value={parentPayAmount || ''}
+                    onChange={e => setParentPayAmount(Number(e.target.value) || 0)}
+                    className="mt-1 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white"
+                  />
+                </label>
+                {(parentPayMethod === 'MTN Mobile Money' || parentPayMethod === 'Airtel Money') && (
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Payer phone number
+                    <input
+                      type="tel"
+                      value={parentPayerPhone}
+                      onChange={e => setParentPayerPhone(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white"
+                    />
+                  </label>
+                )}
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Transaction / receipt reference
+                  <input
+                    type="text"
+                    maxLength={100}
+                    value={parentPaymentReference}
+                    onChange={e => setParentPaymentReference(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white"
+                  />
+                </label>
+                <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <p className="flex-1 text-[11px] text-amber-700 dark:text-amber-300">
+                    This records a payment report only; it does not transfer money or immediately change fees paid.
+                  </p>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingRequest || parentPayAmount <= 0}
+                    className="rounded-xl bg-emerald-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+                  >
+                    {isSubmittingRequest ? 'Submitting...' : 'Send for school verification'}
+                  </button>
+                </div>
+              </>
+            )}
+          </form>
+          {students.length === 0 && (
+            <p className="text-xs text-amber-700">No pupils are linked to your parent account yet. Contact the school administrator.</p>
+          )}
+        </section>
+      )}
+
+      {canRecordPayments && (
+        <section className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5 space-y-3">
+          <h3 className="font-bold text-slate-900 dark:text-white">Parent Payment Requests</h3>
+          {paymentRequestError && <p role="alert" className="text-xs text-rose-600">{paymentRequestError}</p>}
+          {paymentRequests.length === 0 ? (
+            <p className="text-xs text-slate-500">No parent payments are waiting for verification.</p>
+          ) : paymentRequests.map(request => (
+            <div key={request.id} className="flex flex-col sm:flex-row sm:items-center gap-3 border-t border-slate-100 dark:border-slate-700 pt-3">
+              <div className="flex-1 text-xs">
+                <p className="font-bold text-slate-900 dark:text-white">{request.studentName} — {request.grade} · {request.parentName}</p>
+                <p className="text-slate-500">{request.paymentMethod} · {request.referenceNo} · {formatRWF(request.amount)}</p>
+                {request.phoneNumber && <p className="text-slate-500">Payer: {request.phoneNumber}</p>}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={reviewingRequestId === request.id}
+                  onClick={() => handleReviewPaymentRequest(request, 'Verified')}
+                  className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                >
+                  Verify
+                </button>
+                <button
+                  type="button"
+                  disabled={reviewingRequestId === request.id}
+                  onClick={() => handleReviewPaymentRequest(request, 'Rejected')}
+                  className="rounded-lg bg-rose-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs">
@@ -133,7 +383,7 @@ export const FeesTab: React.FC<FeesTabProps> = ({ fees, onRecordPayment }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-              {fees.map(inv => {
+              {visibleFees.map(inv => {
                 const bal = inv.balance ?? (inv.amountTotal - inv.amountPaid);
                 return (
                   <tr key={inv.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-750">

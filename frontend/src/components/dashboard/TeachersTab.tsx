@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { Teacher, SchoolLevel } from '../../types';
-import { Search, Plus, Mail, Phone, BookOpen, GraduationCap, X, Baby } from 'lucide-react';
+import { Search, Plus, Mail, Phone, BookOpen, GraduationCap, X, Camera, Upload } from 'lucide-react';
 
 interface TeachersTabProps {
   teachers: Teacher[];
-  onAddTeacher: (teacher: Teacher) => void;
+  onAddTeacher: (teacher: Teacher) => Promise<void> | void;
   onUpdateTeacher?: (teacher: Teacher) => void;
   onDeleteTeacher?: (id: string) => void;
 }
@@ -14,6 +14,10 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
   const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [teacherAvatar, setTeacherAvatar] = useState('');
+  const [teacherAvatarName, setTeacherAvatarName] = useState('');
+  const [formError, setFormError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const [newTeacher, setNewTeacher] = useState({
     name: '',
     email: '',
@@ -31,9 +35,13 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
     (tch.department || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTeacher.name || !newTeacher.subject) return;
+    setFormError('');
+    if (!newTeacher.name || !newTeacher.subject || !teacherAvatar) {
+      setFormError('Enter the teacher name and subject, and select a profile photo.');
+      return;
+    }
 
     const teacherObj: Teacher = {
       id: `tch-${Date.now()}`,
@@ -46,24 +54,57 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
       qualification: newTeacher.qualification || 'Diploma in Primary Education',
       assignedClasses: newTeacher.assignedClasses.split(',').map(s => s.trim()),
       status: 'Active',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+      avatar: teacherAvatar,
       joinDate: new Date().toISOString().split('T')[0],
     };
 
-    onAddTeacher(teacherObj);
-    setIsAddModalOpen(false);
-    setNewTeacher({
-      name: '',
-      email: '',
-      phone: '+250 788 ',
-      subject: '',
-      department: 'Upper Primary (P4 - P6 Sciences)',
-      level: 'Upper Primary',
-      qualification: 'Bachelor in Primary Education (UR-CE)',
-      assignedClasses: 'Primary 5 Alpha, Primary 6 Candidates',
-    });
+    setIsSaving(true);
+    try {
+      await onAddTeacher(teacherObj);
+      setIsAddModalOpen(false);
+      setTeacherAvatar('');
+      setTeacherAvatarName('');
+      setNewTeacher({
+        name: '',
+        email: '',
+        phone: '+250 788 ',
+        subject: '',
+        department: 'Upper Primary (P4 - P6 Sciences)',
+        level: 'Upper Primary',
+        qualification: 'Bachelor in Primary Education (UR-CE)',
+        assignedClasses: 'Primary 5 Alpha, Primary 6 Candidates',
+      });
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Teacher could not be saved. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setFormError('Choose a JPEG, PNG, or WebP profile photo.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setFormError('Profile photos must be 5 MB or smaller.');
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setTeacherAvatar(reader.result);
+        setTeacherAvatarName(file.name);
+        setFormError('');
+      }
+    };
+    reader.onerror = () => setFormError('The selected profile photo could not be read.');
+    reader.readAsDataURL(file);
+  };
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -183,6 +224,39 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {formError && (
+                <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                  {formError}
+                </p>
+              )}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Teacher Profile Photo *
+                </label>
+                <div className="flex items-center gap-3">
+                  {teacherAvatar ? (
+                    <img src={teacherAvatar} alt="Teacher profile preview" className="w-12 h-12 rounded-xl object-cover" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                      <Camera className="w-5 h-5" />
+                    </div>
+                  )}
+                  <div>
+                    <label htmlFor="teacher-profile-photo" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold cursor-pointer">
+                      <Upload className="w-3.5 h-3.5" />
+                      {teacherAvatar ? 'Change Photo' : 'Choose Photo'}
+                    </label>
+                    <input
+                      id="teacher-profile-photo"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handlePhotoChange}
+                      className="sr-only"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">{teacherAvatarName || 'JPEG, PNG, or WebP; maximum 5 MB'}</p>
+                  </div>
+                </div>
+              </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Teacher Name *
@@ -294,9 +368,10 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs"
+                  disabled={isSaving}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs disabled:opacity-50"
                 >
-                  Appoint Teacher
+                  {isSaving ? 'Saving...' : 'Appoint Teacher'}
                 </button>
               </div>
             </form>

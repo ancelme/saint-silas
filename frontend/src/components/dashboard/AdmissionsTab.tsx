@@ -23,6 +23,8 @@ import {
   GraduationCap,
   MessageSquare,
   Send,
+  Camera,
+  Upload,
   ShieldCheck,
   Bot,
   RotateCcw
@@ -32,7 +34,7 @@ interface AdmissionsTabProps {
   admissions: AdmissionApplication[];
   onApproveAdmission: (admissionId: string, assignedStream: string) => void;
   onRejectAdmission: (admissionId: string) => void;
-  onNewAdmission: (application: AdmissionApplication) => void;
+  onNewAdmission: (application: AdmissionApplication) => Promise<void> | void;
   onAnswerAdmission?: (admissionId: string, decision: 'Approved' | 'Rejected' | 'Under Review', answerText: string, assignedStream?: string) => void;
   currentUserRole?: string;
 }
@@ -60,6 +62,10 @@ export const AdmissionsTab: React.FC<AdmissionsTabProps> = ({
   const [adminAnswerStream, setAdminAnswerStream] = useState('Alpha');
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [admissionPhoto, setAdmissionPhoto] = useState('');
+  const [admissionPhotoName, setAdmissionPhotoName] = useState('');
+  const [admissionFormError, setAdmissionFormError] = useState('');
+  const [isSubmittingAdmission, setIsSubmittingAdmission] = useState(false);
 
   // New Pupil Form State
   const [form, setForm] = useState({
@@ -161,9 +167,38 @@ export const AdmissionsTab: React.FC<AdmissionsTabProps> = ({
     setAnsweringAdmission(null);
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleAdmissionPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setAdmissionFormError('Choose a JPEG, PNG, or WebP pupil photo.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setAdmissionFormError('Pupil photos must be 4 MB or smaller.');
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setAdmissionPhoto(reader.result);
+        setAdmissionPhotoName(file.name);
+        setAdmissionFormError('');
+      }
+    };
+    reader.onerror = () => setAdmissionFormError('The selected pupil photo could not be read.');
+    reader.readAsDataURL(file);
+  };
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.applicantName || !form.parentName) return;
+    setAdmissionFormError('');
+    if (!form.applicantName || !form.parentName || !admissionPhoto) {
+      setAdmissionFormError('Complete the required details and choose a pupil photo.');
+      return;
+    }
 
     const gradeLevel = form.applyingGrade.includes('Nursery')
       ? 'Nursery'
@@ -174,6 +209,7 @@ export const AdmissionsTab: React.FC<AdmissionsTabProps> = ({
     const newApp: AdmissionApplication = {
       id: `adm-${Date.now()}`,
       applicantName: form.applicantName,
+      photoUrl: admissionPhoto,
       gender: form.gender,
       dob: form.dob,
       applyingGrade: form.applyingGrade,
@@ -193,8 +229,18 @@ export const AdmissionsTab: React.FC<AdmissionsTabProps> = ({
       notes: form.notes || 'Submitted via St. Silas Portal.',
     };
 
-    onNewAdmission(newApp);
-    setIsNewModalOpen(false);
+    setIsSubmittingAdmission(true);
+    try {
+      await onNewAdmission(newApp);
+      setIsNewModalOpen(false);
+      setAdmissionPhoto('');
+      setAdmissionPhotoName('');
+    } catch (error) {
+      setAdmissionFormError(error instanceof Error ? error.message : 'The application could not be saved. Please try again.');
+      return;
+    } finally {
+      setIsSubmittingAdmission(false);
+    }
 
     confetti({
       particleCount: 80,
@@ -704,6 +750,11 @@ export const AdmissionsTab: React.FC<AdmissionsTabProps> = ({
               </div>
 
               <form onSubmit={handleFormSubmit} className="space-y-4">
+                {admissionFormError && (
+                  <p role="alert" className="rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                    {admissionFormError}
+                  </p>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -731,6 +782,35 @@ export const AdmissionsTab: React.FC<AdmissionsTabProps> = ({
                         <option key={g} value={g}>{g}</option>
                       ))}
                     </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Pupil Profile Photo *
+                  </label>
+                  <div className="flex items-center gap-3">
+                    {admissionPhoto ? (
+                      <img src={admissionPhoto} alt="Pupil profile preview" className="w-12 h-12 rounded-xl object-cover" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                        <Camera className="w-5 h-5" />
+                      </div>
+                    )}
+                    <div>
+                      <label htmlFor="admission-pupil-photo" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold cursor-pointer">
+                        <Upload className="w-3.5 h-3.5" />
+                        {admissionPhoto ? 'Change Photo' : 'Choose Photo'}
+                      </label>
+                      <input
+                        id="admission-pupil-photo"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handleAdmissionPhotoChange}
+                        className="sr-only"
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">{admissionPhotoName || 'JPEG, PNG, or WebP; maximum 4 MB'}</p>
+                    </div>
                   </div>
                 </div>
 
@@ -773,9 +853,10 @@ export const AdmissionsTab: React.FC<AdmissionsTabProps> = ({
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-700 text-white hover:bg-emerald-800"
+                    disabled={isSubmittingAdmission}
+                    className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-700 text-white hover:bg-emerald-800 disabled:opacity-50"
                   >
-                    Register Application
+                    {isSubmittingAdmission ? 'Submitting...' : 'Register Application'}
                   </button>
                 </div>
               </form>

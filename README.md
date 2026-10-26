@@ -34,8 +34,12 @@ Then open `http://localhost:3001`. Press `Ctrl+C` to stop the server.
 
 An administrator or owner can create a parent account from **User & Role Mgmt**.
 Choose the **Parent / Guardian** role, then select the student or students to
-link before saving. The parent dashboard and student-related API results are
-limited to those linked students. Parents can view their linked students'
+link before saving. New owner, staff, parent, teacher, and pupil profiles
+require a JPEG, PNG, or WebP profile photo (maximum 5 MB for accounts and
+teachers, or 4 MB for pupil enrollment and admission applications). Parent
+payment submissions are linked to a selected pupil and invoice, then remain
+pending until school staff verify them. The parent dashboard and student-related
+API results are limited to those linked students. Parents can view their linked students'
 profiles, attendance, grades, fees, and grade-specific timetable, and can
 contact school staff through chat. The pupil directory is read-only for parents;
 they cannot enroll pupils or modify school records. Dashboard navigation only
