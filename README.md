@@ -76,6 +76,13 @@ instances. Back up the database regularly from the owner-only system backup
 page. Voice recording in browsers requires HTTPS; Render provides HTTPS on the
 service URL.
 
+The Render service must have the persistent disk configured at `/var/data` and
+`SQLITE_FILE_PATH` set to `/var/data/st_silas.sqlite` for school records and
+owner accounts to survive restarts and deployments. A Free Render instance
+does not provide this persistent-disk setup; its local SQLite data can be lost,
+which can cause the initial owner setup to appear again. Do not treat Free
+hosting as permanent storage.
+
 ### Running without internet
 
 The app and its SQLite database run locally. Install dependencies with `npm install` while online before disconnecting; startup does not need internet once the dependencies are present. Gemini AI, Google Maps, Google Fonts, and remotely hosted Unsplash photos do require internet and will be unavailable or use font/image fallbacks while offline.

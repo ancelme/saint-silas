@@ -8,7 +8,8 @@ export async function getFees(req: AuthRequest, res: Response) {
     const userId = req.user?.id;
 
     let query = `
-      SELECT f.*, s.first_name, s.last_name, s.grade, s.admission_number, p.phone as parent_phone
+      SELECT f.*, s.first_name, s.last_name, s.grade, s.admission_number, p.phone as parent_phone,
+             (SELECT payment_method FROM payments WHERE fee_id = f.id ORDER BY created_at DESC LIMIT 1) as latest_payment_method
       FROM fees f
       JOIN students s ON f.student_id = s.id
       LEFT JOIN parents p ON s.parent_id = p.id
@@ -45,6 +46,7 @@ export async function getFees(req: AuthRequest, res: Response) {
       balance: Number(row.balance),
       dueDate: row.due_date || '2026-06-30',
       status: row.status,
+      paymentMethod: row.latest_payment_method || undefined,
       items: [
         { description: 'Term 2 Tuition Fee', amount: Number(row.amount_total) * 0.7 },
         { description: 'Daily Feeding Program (Hot Lunch & Milk)', amount: Number(row.amount_total) * 0.3 }
@@ -61,9 +63,20 @@ export async function getFees(req: AuthRequest, res: Response) {
 export async function recordPayment(req: AuthRequest, res: Response) {
   try {
     const { invoiceId, amount, paymentMethod, referenceNo, phoneNumber } = req.body;
+    const supportedPaymentMethods = ['MTN Mobile Money', 'Airtel Money', 'Bank Transfer', 'Cash'];
+    const paymentAmount = Number(amount);
 
-    if (!invoiceId || !amount || Number(amount) <= 0) {
+    if (!invoiceId || !Number.isFinite(paymentAmount) || paymentAmount <= 0) {
       return res.status(400).json({ error: 'Invoice ID and valid positive amount are required' });
+    }
+    if (!supportedPaymentMethods.includes(paymentMethod)) {
+      return res.status(400).json({ error: `Payment method must be one of: ${supportedPaymentMethods.join(', ')}` });
+    }
+    if (referenceNo !== undefined && (typeof referenceNo !== 'string' || referenceNo.length > 100)) {
+      return res.status(400).json({ error: 'Payment reference must be 100 characters or fewer' });
+    }
+    if (phoneNumber !== undefined && (typeof phoneNumber !== 'string' || phoneNumber.length > 50)) {
+      return res.status(400).json({ error: 'Payer phone number must be 50 characters or fewer' });
     }
 
     const feeRes = await db.query(`SELECT * FROM fees WHERE id = ?`, [invoiceId]);
@@ -72,7 +85,12 @@ export async function recordPayment(req: AuthRequest, res: Response) {
     }
 
     const fee = feeRes.rows[0];
-    const newPaid = Number(fee.amount_paid) + Number(amount);
+    const balance = Math.max(0, Number(fee.amount_total) - Number(fee.amount_paid));
+    if (paymentAmount > balance) {
+      return res.status(400).json({ error: `Payment exceeds the remaining balance of ${balance} RWF` });
+    }
+
+    const newPaid = Number(fee.amount_paid) + paymentAmount;
     const newBalance = Math.max(0, Number(fee.amount_total) - newPaid);
     const newStatus = newBalance === 0 ? 'Paid' : 'Partial';
 
@@ -86,8 +104,10 @@ export async function recordPayment(req: AuthRequest, res: Response) {
     await db.query(`UPDATE students SET fee_status = ? WHERE id = ?`, [newStatus, fee.student_id]);
 
     // Insert payment record
-    const paymentId = `pay-${Date.now()}`;
-    const ref = referenceNo || `MOMO-${Math.floor(100000 + Math.random() * 900000)}`;
+    const paymentId = `pay-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const ref = typeof referenceNo === 'string' && referenceNo.trim()
+      ? referenceNo.trim()
+      : `SSP-${Date.now()}`;
 
     await db.query(
       `INSERT INTO payments (id, fee_id, student_id, amount, payment_method, reference_no, phone_number, status, recorded_by)
@@ -96,8 +116,8 @@ export async function recordPayment(req: AuthRequest, res: Response) {
         paymentId,
         invoiceId,
         fee.student_id,
-        Number(amount),
-        paymentMethod || 'MTN Mobile Money',
+        paymentAmount,
+        paymentMethod,
         ref,
         phoneNumber || '',
         req.user?.id || 'sys'
@@ -109,7 +129,7 @@ export async function recordPayment(req: AuthRequest, res: Response) {
       userName: req.user?.fullName || 'Accountant',
       role: req.user?.role || 'accountant',
       action: 'PAYMENT_RECORD',
-      details: `Recorded payment of ${amount} RWF for invoice ${invoiceId} (Ref: ${ref}) via ${paymentMethod || 'MTN MoMo'}`,
+      details: `Recorded verified payment of ${paymentAmount} RWF for invoice ${invoiceId} (Ref: ${ref}) via ${paymentMethod}`,
       ipAddress: req.ip
     });
 
@@ -117,6 +137,8 @@ export async function recordPayment(req: AuthRequest, res: Response) {
       message: 'Payment recorded successfully',
       paymentId,
       referenceNo: ref,
+      paymentMethod,
+      amountPaid: newPaid,
       newBalance,
       status: newStatus
     });

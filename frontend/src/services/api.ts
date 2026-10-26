@@ -457,11 +457,19 @@ export async function deleteFeeInvoice(id: string) {
 export async function recordPayment(payload: {
   invoiceId: string;
   amount: number;
-  paymentMethod: string;
+  paymentMethod: 'MTN Mobile Money' | 'Airtel Money' | 'Bank Transfer' | 'Cash';
   referenceNo?: string;
   phoneNumber?: string;
 }) {
-  return request<{ message: string; paymentId: string; newBalance: number; status: string }>('/api/fees/payment', {
+  return request<{
+    message: string;
+    paymentId: string;
+    referenceNo: string;
+    paymentMethod: 'MTN Mobile Money' | 'Airtel Money' | 'Bank Transfer' | 'Cash';
+    amountPaid: number;
+    newBalance: number;
+    status: string;
+  }>('/api/fees/payment', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

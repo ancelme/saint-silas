@@ -90,7 +90,13 @@ interface DashboardLayoutProps {
   onSaveTimetable: (timetable: TimetableSlot[]) => Promise<void>;
   onSaveSchoolEvents: (events: SchoolEvent[]) => Promise<void>;
   onUpdateGrade: (grade: GradeEntry) => void;
-  onRecordPayment: (invoiceId: string, amount: number, method: 'MTN Mobile Money' | 'Airtel Money' | 'Bank Transfer') => void;
+  onRecordPayment: (
+    invoiceId: string,
+    amount: number,
+    method: 'MTN Mobile Money' | 'Airtel Money' | 'Bank Transfer' | 'Cash',
+    referenceNo?: string,
+    phoneNumber?: string,
+  ) => Promise<string>;
   onAddFeeInvoice?: (invoice: FeeInvoice) => void;
   onUpdateFeeInvoice?: (invoice: FeeInvoice) => void;
   onDeleteFeeInvoice?: (id: string) => void;

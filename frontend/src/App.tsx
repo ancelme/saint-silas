@@ -299,36 +299,29 @@ const MainApp: React.FC = () => {
   const handleRecordPayment = async (
     invoiceId: string,
     amount: number,
-    method: 'MTN Mobile Money' | 'Airtel Money' | 'Bank Transfer'
+    method: 'MTN Mobile Money' | 'Airtel Money' | 'Bank Transfer' | 'Cash',
+    referenceNo?: string,
+    phoneNumber?: string,
   ) => {
-    try {
-      await apiRecordPayment({
-        invoiceId,
-        amount,
-        paymentMethod: method,
-      });
-      // Refresh fees
-      const updatedFees = await fetchFees();
-      setFees(updatedFees);
-      notifySuccess('Payment recorded successfully.');
-    } catch (e) {
-      console.error('Failed to record payment via API:', e);
-      setFees(prev =>
-        prev.map(f => {
-          if (f.id === invoiceId) {
-            const newPaid = f.amountPaid + amount;
-            const newBalance = Math.max(0, f.amountTotal - newPaid);
-            return {
-              ...f,
-              amountPaid: newPaid,
-              balance: newBalance,
-              status: newBalance === 0 ? 'Paid' : 'Partial',
-            };
-          }
-          return f;
-        })
-      );
-    }
+    const result = await apiRecordPayment({
+      invoiceId,
+      amount,
+      paymentMethod: method,
+      referenceNo,
+      phoneNumber,
+    });
+    setFees(prev => prev.map(f => {
+      if (f.id !== invoiceId) return f;
+      return {
+        ...f,
+        amountPaid: result.amountPaid,
+        balance: result.newBalance,
+        status: result.status as FeeInvoice['status'],
+        paymentMethod: result.paymentMethod,
+      };
+    }));
+    notifySuccess('Payment recorded successfully.');
+    return result.referenceNo;
   };
 
   const handleAddFeeInvoice = async (invoice: FeeInvoice) => {
