@@ -114,6 +114,60 @@ async function saveContent(
 }
 
 export async function getTimetable(req: AuthRequest, res: Response) {
+  if (req.user?.role === 'teacher') {
+    try {
+      const teacherResult = await db.query(`SELECT id, teacher_type FROM teachers WHERE user_id = ?`, [req.user.id]);
+      const teacher = teacherResult.rows[0];
+      if (!teacher) return res.status(403).json({ error: 'Teacher assignment could not be found.' });
+
+      const [contentResult, classesResult, subjectResult] = await Promise.all([
+        db.query<{ content_json: string }>(
+          'SELECT content_json FROM school_content WHERE content_key = ?',
+          ['timetable'],
+        ),
+        db.query(
+          `SELECT DISTINCT c.name
+           FROM classes c
+           WHERE c.class_teacher_id = ?
+           UNION
+           SELECT DISTINCT c.name
+           FROM teacher_subject_assignments tsa
+           JOIN classes c ON c.id = tsa.class_id
+           WHERE tsa.teacher_id = ?`,
+          [teacher.id, teacher.id],
+        ),
+        db.query(
+          `SELECT DISTINCT s.name
+           FROM teacher_subject_assignments tsa
+           JOIN subjects s ON s.id = tsa.subject_id
+           WHERE tsa.teacher_id = ?`,
+          [teacher.id],
+        ),
+      ]);
+      if (contentResult.rows.length === 0) return res.json({ items: [] });
+
+      const classNames = classesResult.rows.map(row => String(row.name));
+      const subjectNames = new Set(subjectResult.rows.map(row => String(row.name).toLowerCase()));
+      const items = JSON.parse(contentResult.rows[0].content_json) as TimetableSlot[];
+      return res.json({
+        items: items.filter(item => {
+          const slotGrade = item.grade.toLowerCase();
+          const assignedClass = classNames.some(className => {
+            const classValue = className.toLowerCase();
+            return classValue === slotGrade || classValue.startsWith(slotGrade) || slotGrade.startsWith(classValue);
+          });
+          if (!assignedClass) return false;
+          if (teacher.teacher_type === 'class_teacher') return true;
+          return subjectNames.has(item.subject.toLowerCase()) &&
+            item.teacherName.toLowerCase() === req.user!.fullName.toLowerCase();
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to load teacher timetable:', error);
+      return res.status(500).json({ error: 'Failed to load teacher timetable' });
+    }
+  }
+
   if (req.user?.role !== 'parent') {
     return getContent('timetable', res);
   }

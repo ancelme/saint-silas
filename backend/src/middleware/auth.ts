@@ -7,6 +7,14 @@ const JWT_SECRET = process.env.JWT_SECRET || (
     ? ''
     : 'st_silas_primary_school_jwt_secret_key_2026_rwanda'
 );
+const SESSION_COOKIE_NAME = 'st_silas_session';
+const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  path: '/',
+  maxAge: 30 * 24 * 60 * 60 * 1000,
+};
 
 if (!JWT_SECRET) {
   throw new Error('JWT_SECRET must be set when NODE_ENV is production.');
@@ -20,6 +28,7 @@ export interface AuthenticatedUser {
   fullName: string;
   status?: string;
   mustChangePassword?: boolean;
+  teacherType?: 'class_teacher' | 'subject_teacher';
 }
 
 export interface AuthRequest extends Request {
@@ -34,14 +43,46 @@ export function generateToken(payload: {
   fullName: string;
   mustChangePassword?: boolean;
 }): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
+}
+
+export function setSessionCookie(res: Response, token: string): void {
+  res.cookie(SESSION_COOKIE_NAME, token, SESSION_COOKIE_OPTIONS);
+}
+
+export function clearSessionCookie(res: Response): void {
+  res.clearCookie(SESSION_COOKIE_NAME, {
+    httpOnly: SESSION_COOKIE_OPTIONS.httpOnly,
+    secure: SESSION_COOKIE_OPTIONS.secure,
+    sameSite: SESSION_COOKIE_OPTIONS.sameSite,
+    path: SESSION_COOKIE_OPTIONS.path,
+  });
+}
+
+export function getSessionCookieToken(cookieHeader?: string): string | undefined {
+  if (!cookieHeader) return undefined;
+
+  for (const cookie of cookieHeader.split(';')) {
+    const separator = cookie.indexOf('=');
+    if (separator < 0 || cookie.slice(0, separator).trim() !== SESSION_COOKIE_NAME) continue;
+
+    try {
+      return decodeURIComponent(cookie.slice(separator + 1).trim());
+    } catch {
+      return undefined;
+    }
+  }
+
+  return undefined;
 }
 
 export async function authenticateSocketToken(token: string): Promise<AuthenticatedUser | null> {
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser;
     const userResult = await db.query(
-      `SELECT id, username, email, full_name, role, status, is_active, must_change_password FROM users WHERE id = ?`,
+      `SELECT u.id, u.username, u.email, u.full_name, u.role, u.status, u.is_active, u.must_change_password,
+              t.teacher_type
+       FROM users u LEFT JOIN teachers t ON t.user_id = u.id WHERE u.id = ?`,
       [decoded.id],
     );
     const user = userResult.rows[0];
@@ -55,6 +96,7 @@ export async function authenticateSocketToken(token: string): Promise<Authentica
       fullName: user.full_name,
       status: user.status,
       mustChangePassword: Number(user.must_change_password) === 1,
+      teacherType: user.teacher_type,
     };
   } catch {
     return null;
@@ -63,7 +105,7 @@ export async function authenticateSocketToken(token: string): Promise<Authentica
 
 export async function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = (authHeader && authHeader.split(' ')[1]) || getSessionCookieToken(req.headers.cookie);
 
   if (!token) {
     return res.status(401).json({ error: 'Authentication token required' });
@@ -74,7 +116,9 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
     
     // Check if user still exists and is active in database
     const userResult = await db.query(
-      `SELECT id, username, email, full_name, role, status, is_active, must_change_password FROM users WHERE id = ?`,
+      `SELECT u.id, u.username, u.email, u.full_name, u.role, u.status, u.is_active, u.must_change_password,
+              t.teacher_type
+       FROM users u LEFT JOIN teachers t ON t.user_id = u.id WHERE u.id = ?`,
       [decoded.id]
     );
 
@@ -95,6 +139,7 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
       fullName: dbUser.full_name,
       status: dbUser.status,
       mustChangePassword: Number(dbUser.must_change_password) === 1,
+      teacherType: dbUser.teacher_type,
     };
 
     next();

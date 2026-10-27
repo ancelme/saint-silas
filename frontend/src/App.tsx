@@ -45,8 +45,10 @@ import {
   recordPayment as apiRecordPayment,
   fetchAttendance,
   saveAttendance as apiSaveAttendance,
+  deleteAttendance as apiDeleteAttendance,
   fetchGrades,
   saveGrade as apiSaveGrade,
+  deleteGrade as apiDeleteGrade,
   fetchAnnouncements,
   createAnnouncement as apiCreateAnnouncement,
   updateAnnouncement as apiUpdateAnnouncement,
@@ -250,19 +252,42 @@ const MainApp: React.FC = () => {
 
   const handleSaveAttendance = async (newRecords: AttendanceRecord[]) => {
     try {
-      await apiSaveAttendance(newRecords);
+      const saved = await apiSaveAttendance(newRecords);
       notifySuccess('Attendance records saved successfully.');
       setAttendance(prev => {
-        const recordMap = new Map<string, AttendanceRecord>();
-        prev.forEach(r => recordMap.set(r.id, r));
-        newRecords.forEach(r => recordMap.set(r.id, r));
-        return Array.from(recordMap.values());
+        const matchesSavedRecord = (existing: AttendanceRecord, updated: AttendanceRecord) =>
+          existing.studentId === updated.studentId &&
+          existing.date?.slice(0, 10) === updated.date &&
+          existing.subjectId === updated.subjectId;
+        const next = new Map(
+          prev.filter(existing => !newRecords.some(updated => matchesSavedRecord(existing, updated)))
+            .map(record => [record.id, record]),
+        );
+        for (const record of newRecords) {
+          const persisted = saved.records.find(item =>
+            item.studentId === record.studentId &&
+            item.date === record.date &&
+            item.subjectId === record.subjectId
+          );
+          next.set(persisted?.id || record.id, { ...record, id: persisted?.id || record.id });
+        }
+        return Array.from(next.values());
       });
       // Refresh students to update attendance rate
       fetchStudents().then(res => setStudents(res)).catch(() => {});
     } catch (e) {
       console.error('Failed to save attendance via API:', e);
       throw e;
+    }
+  };
+
+  const handleDeleteAttendance = async (attendanceId: string) => {
+    await apiDeleteAttendance(attendanceId);
+    setAttendance(prev => prev.filter(record => record.id !== attendanceId));
+    try {
+      setStudents(await fetchStudents());
+    } catch (error) {
+      console.error('Attendance was deleted, but pupil attendance summaries could not be refreshed:', error);
     }
   };
 
@@ -283,14 +308,52 @@ const MainApp: React.FC = () => {
       await apiSaveGrade({
         studentId: updatedGrade.studentId,
         subject: updatedGrade.subject,
-        marks: updatedGrade.marks !== undefined ? updatedGrade.marks : (updatedGrade.totalScore || 85),
+        marks: updatedGrade.totalScore ?? updatedGrade.total ?? updatedGrade.marks ?? 85,
         remarks: updatedGrade.remarks
       });
       setGrades(prev => prev.map(g => (g.id === updatedGrade.id ? updatedGrade : g)));
       notifySuccess('Pupil grade saved successfully.');
     } catch (e) {
       console.error('Failed to save grade via API:', e);
-      setGrades(prev => prev.map(g => (g.id === updatedGrade.id ? updatedGrade : g)));
+      throw e;
+    }
+  };
+
+  const handleCreateGrade = async (payload: { studentId: string; subject: string; marks: number; remarks?: string }) => {
+    const result = await apiSaveGrade(payload);
+    const student = students.find(item => item.id === payload.studentId);
+    const grade: GradeEntry = {
+      id: result.grade.id,
+      studentId: payload.studentId,
+      studentName: student ? `${student.firstName} ${student.lastName}` : '',
+      grade: student?.grade,
+      subject: result.grade.subject,
+      term: 'Term 2',
+      quiz: payload.marks,
+      midTerm: payload.marks,
+      finalExam: payload.marks,
+      total: payload.marks,
+      totalScore: payload.marks,
+      marks: payload.marks,
+      gradeLetter: result.grade.grade,
+      letterGrade: result.grade.grade,
+      remarks: result.grade.remarks,
+    };
+    setGrades(prev => [
+      ...prev.filter(existing => existing.id !== grade.id),
+      grade,
+    ]);
+    notifySuccess('Subject mark recorded successfully.');
+  };
+
+  const handleDeleteGrade = async (gradeId: string) => {
+    try {
+      await apiDeleteGrade(gradeId);
+      setGrades(prev => prev.filter(grade => grade.id !== gradeId));
+      notifySuccess('Subject marks deleted successfully.');
+    } catch (error) {
+      console.error('Failed to delete subject marks:', error);
+      throw error;
     }
   };
 
@@ -506,9 +569,12 @@ const MainApp: React.FC = () => {
         onUpdateTeacher={handleUpdateTeacher}
         onDeleteTeacher={handleDeleteTeacher}
         onSaveAttendance={handleSaveAttendance}
+        onDeleteAttendance={handleDeleteAttendance}
         onSaveTimetable={handleSaveTimetable}
         onSaveSchoolEvents={handleSaveSchoolEvents}
         onUpdateGrade={handleUpdateGrade}
+        onCreateGrade={handleCreateGrade}
+        onDeleteGrade={handleDeleteGrade}
         onRecordPayment={handleRecordPayment}
         onAddFeeInvoice={handleAddFeeInvoice}
         onUpdateFeeInvoice={handleUpdateFeeInvoice}

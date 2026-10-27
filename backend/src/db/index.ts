@@ -1,132 +1,65 @@
-import fs from 'fs';
-import path from 'path';
-import net from 'net';
-import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
-import mysql, { Pool as MysqlPool } from 'mysql2/promise';
-import { fileURLToPath } from 'url';
+import { Pool, type QueryResultRow } from 'pg';
 
-function isPortReachable(host: string, port: number, timeoutMs = 500): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    socket.setTimeout(timeoutMs);
-    socket.once('connect', () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once('timeout', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    socket.once('error', () => {
-      socket.destroy();
-      resolve(false);
-    });
-    try {
-      socket.connect(port, host);
-    } catch {
-      resolve(false);
+function toPostgresPlaceholders(sql: string): string {
+  let converted = '';
+  let parameterIndex = 0;
+  let quote: "'" | '"' | null = null;
+
+  for (let i = 0; i < sql.length; i += 1) {
+    const character = sql[i];
+    if (quote) {
+      converted += character;
+      if (character === quote) {
+        if (sql[i + 1] === quote) {
+          converted += sql[i + 1];
+          i += 1;
+        } else {
+          quote = null;
+        }
+      }
+    } else if (character === "'" || character === '"') {
+      quote = character;
+      converted += character;
+    } else if (character === '?') {
+      parameterIndex += 1;
+      converted += `$${parameterIndex}`;
+    } else {
+      converted += character;
     }
-  });
+  }
+
+  return converted;
 }
 
 export interface QueryResult<T = any> {
   rows: T[];
-  insertId?: number | string;
   affectedRows?: number;
 }
 
 class DatabaseManager {
-  private mysqlPool: MysqlPool | null = null;
-  private sqliteDb: SqlJsDatabase | null = null;
-  private engine: 'mysql' | 'sqlite' = 'sqlite';
-  private sqliteFilePath = path.resolve(
-    process.env.SQLITE_FILE_PATH || path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      '..',
-      '..',
-      'data',
-      'st_silas.sqlite',
-    ),
-  );
+  private postgresPool: Pool | null = null;
   private isInitialized = false;
 
   async init(): Promise<void> {
     if (this.isInitialized) return;
 
-    // Check if MySQL connection parameters exist
-    const host = process.env.DATABASE_HOST;
-    const user = process.env.DATABASE_USER;
-    const password = process.env.DATABASE_PASSWORD;
-    const database = process.env.DATABASE_NAME || 'st_silas_db';
-    const port = Number(process.env.DATABASE_PORT) || 3306;
-
-    if (host && user) {
-      const isReachable = await isPortReachable(host, port, 400);
-      if (isReachable) {
-        try {
-          const pool = mysql.createPool({
-            host,
-            user,
-            password,
-            database,
-            port,
-            waitForConnections: true,
-            connectionLimit: 10,
-            queueLimit: 0,
-          });
-
-          // Test connection
-          const conn = await pool.getConnection();
-          conn.release();
-          this.mysqlPool = pool;
-          this.engine = 'mysql';
-          console.log('✅ [DB] Connected to MySQL database successfully.');
-        } catch {
-          this.mysqlPool = null;
-        }
-      }
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      throw new Error('DATABASE_URL is required to connect to PostgreSQL.');
     }
 
-    if (!this.mysqlPool) {
-      // Fallback: pure relational SQL via sql.js with disk persistence
-      const SQL = await initSqlJs();
-      
-      const dataDir = path.dirname(this.sqliteFilePath);
-      if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-      }
-
-      if (fs.existsSync(this.sqliteFilePath)) {
-        try {
-          const fileBuffer = fs.readFileSync(this.sqliteFilePath);
-          this.sqliteDb = new SQL.Database(fileBuffer);
-          console.log(`✅ [DB] Loaded existing SQL database from ${this.sqliteFilePath}`);
-        } catch (e) {
-          console.warn('[DB] Could not parse existing database file, creating fresh database.');
-          this.sqliteDb = new SQL.Database();
-        }
-      } else {
-        this.sqliteDb = new SQL.Database();
-        console.log('✅ [DB] Created new SQL database.');
-      }
-      this.engine = 'sqlite';
+    const pool = new Pool({ connectionString });
+    try {
+      await pool.query('SELECT 1');
+      this.postgresPool = pool;
+      console.log('✅ [DB] Connected to PostgreSQL database successfully.');
+    } catch (error) {
+      await pool.end();
+      throw new Error('Failed to connect to PostgreSQL.', { cause: error });
     }
 
-    // Run migrations and initial seed
     await this.runBootstrapMigrations();
     this.isInitialized = true;
-  }
-
-  private saveSqliteToDisk(): void {
-    if (this.sqliteDb) {
-      try {
-        const data = this.sqliteDb.export();
-        const buffer = Buffer.from(data);
-        fs.writeFileSync(this.sqliteFilePath, buffer);
-      } catch (e) {
-        console.error('[DB] Failed to persist SQLite database to disk:', e);
-      }
-    }
   }
 
   private async runBootstrapMigrations(): Promise<void> {
@@ -225,6 +158,7 @@ class DatabaseManager {
         id VARCHAR(36) PRIMARY KEY,
         user_id VARCHAR(36) NOT NULL UNIQUE,
         employee_id VARCHAR(50) NOT NULL UNIQUE,
+        teacher_type VARCHAR(30) NOT NULL DEFAULT 'subject_teacher',
         specialization VARCHAR(150),
         qualification VARCHAR(100),
         phone VARCHAR(50),
@@ -283,6 +217,7 @@ class DatabaseManager {
         id VARCHAR(36) PRIMARY KEY,
         student_id VARCHAR(36) NOT NULL,
         class_id VARCHAR(36) NOT NULL,
+        subject_id VARCHAR(36),
         date DATE NOT NULL,
         status VARCHAR(20) NOT NULL,
         remarks VARCHAR(255),
@@ -413,7 +348,7 @@ class DatabaseManager {
         parent_name VARCHAR(150) NOT NULL,
         parent_phone VARCHAR(50) NOT NULL,
         parent_email VARCHAR(191),
-        photo_url LONGTEXT,
+        photo_url TEXT,
         district VARCHAR(100) DEFAULT 'Gatsibo',
         sector VARCHAR(100) DEFAULT 'Kabarore',
         cell VARCHAR(100) DEFAULT 'Simbwa',
@@ -450,12 +385,49 @@ class DatabaseManager {
         content_key VARCHAR(50) PRIMARY KEY,
         content_json TEXT NOT NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+      `CREATE TABLE IF NOT EXISTS teacher_subject_assignments (
+        id VARCHAR(36) PRIMARY KEY,
+        teacher_id VARCHAR(36) NOT NULL,
+        class_id VARCHAR(36) NOT NULL,
+        subject_id VARCHAR(36) NOT NULL,
+        UNIQUE (teacher_id, class_id, subject_id)
+      );`,
+      `CREATE TABLE IF NOT EXISTS student_reports (
+        id VARCHAR(100) PRIMARY KEY,
+        student_id VARCHAR(36) NOT NULL,
+        period VARCHAR(50) NOT NULL,
+        report_json TEXT NOT NULL,
+        teacher_id VARCHAR(36) NOT NULL,
+        published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (student_id, period)
       );`
     ];
 
     for (const q of tableQueries) {
       await this.query(q);
     }
+
+    const teacherColumns = await this.query<{ name: string }>(
+      `SELECT column_name AS name
+       FROM information_schema.columns
+       WHERE table_schema = current_schema() AND table_name = ?`,
+      ['teachers'],
+    );
+    if (!teacherColumns.rows.some(({ name }) => name === 'teacher_type')) {
+      await this.query(`ALTER TABLE teachers ADD COLUMN teacher_type VARCHAR(30) NOT NULL DEFAULT 'subject_teacher'`);
+    }
+    await this.query(`ALTER TABLE attendance ADD COLUMN IF NOT EXISTS subject_id VARCHAR(36)`);
+    await this.query(`ALTER TABLE attendance DROP CONSTRAINT IF EXISTS unique_student_date`);
+    await this.query(`DROP INDEX IF EXISTS unique_student_date_subject`);
+    await this.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS unique_class_attendance_per_day
+       ON attendance (student_id, date) WHERE subject_id IS NULL`,
+    );
+    await this.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS unique_subject_attendance_per_day
+       ON attendance (student_id, date, subject_id) WHERE subject_id IS NOT NULL`,
+    );
 
     await this.query(
       `INSERT INTO parent_students (parent_id, student_id)
@@ -469,12 +441,12 @@ class DatabaseManager {
          )`,
     );
 
-    const userColumns = this.engine === 'mysql'
-      ? await this.query<{ name: string }>(
-        `SELECT COLUMN_NAME AS name FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
-        ['users'],
-      )
-      : await this.query<{ name: string }>(`PRAGMA table_info(users)`);
+    const userColumns = await this.query<{ name: string }>(
+      `SELECT column_name AS name
+       FROM information_schema.columns
+       WHERE table_schema = current_schema() AND table_name = ?`,
+      ['users'],
+    );
     const existingUserColumns = new Set(userColumns.rows.map(({ name }) => name));
     const userColumnMigrations = [
       ['must_change_password', 'INT DEFAULT 0'],
@@ -493,22 +465,22 @@ class DatabaseManager {
       }
     }
 
-    const admissionColumns = this.engine === 'mysql'
-      ? await this.query<{ name: string }>(
-        `SELECT COLUMN_NAME AS name FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
-        ['admissions'],
-      )
-      : await this.query<{ name: string }>(`PRAGMA table_info(admissions)`);
+    const admissionColumns = await this.query<{ name: string }>(
+      `SELECT column_name AS name
+       FROM information_schema.columns
+       WHERE table_schema = current_schema() AND table_name = ?`,
+      ['admissions'],
+    );
     if (!admissionColumns.rows.some(({ name }) => name === 'photo_url')) {
-      await this.query(`ALTER TABLE admissions ADD COLUMN photo_url LONGTEXT`);
+      await this.query(`ALTER TABLE admissions ADD COLUMN photo_url TEXT`);
     }
 
-    const messageColumns = this.engine === 'mysql'
-      ? await this.query<{ name: string; data_type?: string; type?: string }>(
-        `SELECT COLUMN_NAME AS name, DATA_TYPE AS data_type FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
-        ['messages'],
-      )
-      : await this.query<{ name: string; data_type?: string; type?: string }>(`PRAGMA table_info(messages)`);
+    const messageColumns = await this.query<{ name: string; data_type?: string }>(
+      `SELECT column_name AS name, data_type
+       FROM information_schema.columns
+       WHERE table_schema = current_schema() AND table_name = ?`,
+      ['messages'],
+    );
     const existingMessageColumns = new Set(messageColumns.rows.map(({ name }) => name));
     const messageColumnMigrations = [
       ['delivery_status', "VARCHAR(20) NOT NULL DEFAULT 'sent'"],
@@ -523,10 +495,6 @@ class DatabaseManager {
         await this.query(`ALTER TABLE messages ADD COLUMN ${column} ${definition}`);
       }
     }
-    if (this.engine === 'mysql' && messageColumns.rows.find(column => column.name === 'body')?.data_type !== 'longtext') {
-      await this.query(`ALTER TABLE messages MODIFY COLUMN body LONGTEXT NOT NULL`);
-    }
-
     await this.query(
       `UPDATE messages SET delivery_status = 'read', read_at = COALESCE(read_at, CURRENT_TIMESTAMP) WHERE is_read = 1 AND delivery_status = 'sent'`,
     );
@@ -602,7 +570,9 @@ class DatabaseManager {
       ];
 
       for (const stmt of seedStatements) {
-        const queryToRun = this.engine === 'mysql' ? stmt.replace(/INSERT OR IGNORE/g, 'INSERT IGNORE') : stmt;
+        const queryToRun = stmt
+          .replace(/INSERT OR IGNORE INTO/g, 'INSERT INTO')
+          .replace(/;$/, ' ON CONFLICT DO NOTHING;');
         await this.query(queryToRun);
       }
     }
@@ -610,51 +580,17 @@ class DatabaseManager {
   }
 
   async query<T = any>(sql: string, params: any[] = []): Promise<QueryResult<T>> {
-    if (this.engine === 'mysql' && this.mysqlPool) {
-      const [result] = await this.mysqlPool.query(sql, params);
-      if (Array.isArray(result)) {
-        return { rows: result as T[] };
-      }
-      const header = result as mysql.ResultSetHeader;
-      return {
-        rows: [],
-        insertId: header.insertId,
-        affectedRows: header.affectedRows,
-      };
-    } else if (this.sqliteDb) {
-      try {
-        const trimmed = sql.trim();
-        const isSelect = trimmed.toUpperCase().startsWith('SELECT') || trimmed.toUpperCase().startsWith('PRAGMA');
-        
-        if (isSelect) {
-          const stmt = this.sqliteDb.prepare(sql);
-          if (params.length > 0) {
-            stmt.bind(params);
-          }
-          const rows: T[] = [];
-          while (stmt.step()) {
-            rows.push(stmt.getAsObject() as T);
-          }
-          stmt.free();
-          return { rows };
-        } else {
-          // Execute mutation
-          this.sqliteDb.run(sql, params);
-          this.saveSqliteToDisk();
-          return { rows: [], affectedRows: 1 };
-        }
-      } catch (err: any) {
-        console.error(`[DB Error] query failed: "${sql}" with params ${JSON.stringify(params)}:`, err);
-        throw err;
-      }
+    if (!this.postgresPool) {
+      throw new Error('Database not initialized');
     }
 
-    throw new Error('Database not initialized');
+    const result = await this.postgresPool.query<T & QueryResultRow>(toPostgresPlaceholders(sql), params);
+    return { rows: result.rows, affectedRows: result.rowCount ?? 0 };
   }
 
-  getDatabaseEngine(): { engine: 'mysql' | 'sqlite'; isConnected: boolean } {
+  getDatabaseEngine(): { engine: 'postgresql'; isConnected: boolean } {
     return {
-      engine: this.engine,
+      engine: 'postgresql',
       isConnected: this.isInitialized,
     };
   }
@@ -667,10 +603,9 @@ class DatabaseManager {
   async generateSqlBackup(): Promise<string> {
     const dumpLines: string[] = [
       `-- =============================================================`,
-      `-- ST. SILAS PRIVATE PRIMARY SCHOOL - OFFICIAL MYSQL BACKUP DUMP`,
+      `-- ST. SILAS PRIVATE PRIMARY SCHOOL - POSTGRESQL DATA BACKUP`,
       `-- Exported on: ${new Date().toISOString()}`,
       `-- =============================================================`,
-      `SET FOREIGN_KEY_CHECKS = 0;`,
     ];
 
     const tables = [
@@ -682,26 +617,23 @@ class DatabaseManager {
     ];
 
     for (const table of tables) {
-      try {
-        const res = await this.query(`SELECT * FROM ${table}`);
-        if (res.rows.length > 0) {
-          dumpLines.push(`\n-- Data for table: ${table} (${res.rows.length} rows)`);
-          for (const row of res.rows) {
-            const columns = Object.keys(row).map(c => `\`${c}\``).join(', ');
-            const values = Object.values(row).map(val => {
-              if (val === null || val === undefined) return 'NULL';
-              if (typeof val === 'number') return val;
-              return `'${String(val).replace(/'/g, "''")}'`;
-            }).join(', ');
-            dumpLines.push(`INSERT INTO \`${table}\` (${columns}) VALUES (${values});`);
-          }
+      const res = await this.query(`SELECT * FROM ${table}`);
+      if (res.rows.length > 0) {
+        dumpLines.push(`\n-- Data for table: ${table} (${res.rows.length} rows)`);
+        for (const row of res.rows) {
+          const columns = Object.keys(row).map(column => `"${column.replace(/"/g, '""')}"`).join(', ');
+          const values = Object.values(row).map(value => {
+            if (value === null || value === undefined) return 'NULL';
+            if (typeof value === 'number') return String(value);
+            if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+            const text = value instanceof Date ? value.toISOString() : String(value);
+            return `'${text.replace(/'/g, "''")}'`;
+          }).join(', ');
+          dumpLines.push(`INSERT INTO "${table}" (${columns}) VALUES (${values});`);
         }
-      } catch (e) {
-        // Table may not have records
       }
     }
 
-    dumpLines.push(`\nSET FOREIGN_KEY_CHECKS = 1;`);
     return dumpLines.join('\n');
   }
 }

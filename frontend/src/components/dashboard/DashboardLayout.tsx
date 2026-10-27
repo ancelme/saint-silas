@@ -60,6 +60,8 @@ import { AdmissionsTab } from './AdmissionsTab';
 import { UserManagementTab } from './UserManagementTab';
 import { UserLogsTab } from './UserLogsTab';
 import { SettingsTab } from './SettingsTab';
+import { TeacherReportsTab } from './TeacherReportsTab';
+import { ParentReportsTab } from './ParentReportsTab';
 import {
   AccountNotification,
   fetchAuditLogs,
@@ -87,9 +89,12 @@ interface DashboardLayoutProps {
   onUpdateTeacher?: (teacher: Teacher) => void;
   onDeleteTeacher?: (id: string) => void;
   onSaveAttendance: (records: AttendanceRecord[]) => void;
+  onDeleteAttendance: (attendanceId: string) => Promise<void>;
   onSaveTimetable: (timetable: TimetableSlot[]) => Promise<void>;
   onSaveSchoolEvents: (events: SchoolEvent[]) => Promise<void>;
-  onUpdateGrade: (grade: GradeEntry) => void;
+  onUpdateGrade: (grade: GradeEntry) => Promise<void> | void;
+  onCreateGrade: (payload: { studentId: string; subject: string; marks: number; remarks?: string }) => Promise<void>;
+  onDeleteGrade: (gradeId: string) => Promise<void>;
   onRecordPayment: (
     invoiceId: string,
     amount: number,
@@ -128,9 +133,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   onUpdateTeacher,
   onDeleteTeacher,
   onSaveAttendance,
+  onDeleteAttendance,
   onSaveTimetable,
   onSaveSchoolEvents,
   onUpdateGrade,
+  onCreateGrade,
+  onDeleteGrade,
   onRecordPayment,
   onAddFeeInvoice,
   onUpdateFeeInvoice,
@@ -276,6 +284,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     { id: 'timetable', label: t('dashTimetable'), icon: Calendar, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'student', 'parent'] },
     { id: 'attendance', label: t('dashAttendance'), icon: CalendarCheck2, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'student', 'parent'] },
     { id: 'grades', label: t('dashGrades'), icon: Award, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'student', 'parent'] },
+    { id: 'reports', label: currentRole === 'parent' ? 'Pupil Reports' : 'Midterm Reports', icon: FileText, roles: ['teacher', 'parent'] },
     { id: 'fees', label: t('dashFees'), icon: Wallet, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'accountant', 'parent', 'student'] },
     { id: 'library', label: t('dashLibrary'), icon: BookOpen, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'librarian', 'student'] },
     { id: 'chat', label: 'Chat', icon: MessageSquare, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'accountant', 'librarian', 'parent', 'student'] },
@@ -286,7 +295,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     { id: 'settings', label: 'System & Database', icon: Settings, roles: ['owner', 'super_admin'] },
   ];
 
-  const visibleNavItems = allNavItems.filter(item => item.roles.includes(currentRole));
+  const visibleNavItems = allNavItems.filter(item =>
+    item.roles.includes(currentRole) &&
+    (item.id !== 'attendance' || currentRole !== 'teacher' || user?.teacherType === 'class_teacher') &&
+    (item.id !== 'reports' || currentRole === 'parent' || user?.teacherType === 'class_teacher')
+  );
 
   useEffect(() => {
     if (!visibleNavItems.some(item => item.id === activeTab)) {
@@ -680,6 +693,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               onAddTeacher={onAddTeacher}
               onUpdateTeacher={onUpdateTeacher}
               onDeleteTeacher={onDeleteTeacher}
+              currentUserRole={currentRole}
             />
           )}
 
@@ -696,6 +710,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               students={students}
               attendanceRecords={attendance}
               onSaveAttendance={onSaveAttendance}
+              onDeleteAttendance={onDeleteAttendance}
+              teacherType={currentRole === 'teacher' ? user?.teacherType : undefined}
+              canEditAttendance={['owner', 'super_admin', 'admin', 'head_teacher'].includes(currentRole) ||
+                currentRole === 'teacher'}
             />
           )}
 
@@ -704,8 +722,18 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               students={students}
               grades={grades}
               onUpdateGrade={onUpdateGrade}
+              onCreateGrade={onCreateGrade}
+              onDeleteGrade={onDeleteGrade}
+              teacherType={currentRole === 'teacher' ? user?.teacherType : undefined}
+              canEditGrades={['owner', 'super_admin', 'admin', 'head_teacher'].includes(currentRole) ||
+                (currentRole === 'teacher' && user?.teacherType === 'subject_teacher')}
             />
           )}
+
+          {activeTab === 'reports' && currentRole === 'teacher' && user?.teacherType === 'class_teacher' && (
+            <TeacherReportsTab students={students} />
+          )}
+          {activeTab === 'reports' && currentRole === 'parent' && <ParentReportsTab />}
 
           {activeTab === 'fees' && (
             <FeesTab

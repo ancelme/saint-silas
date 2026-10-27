@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { Server as HttpServer } from 'http';
 import { db } from '../db/index';
-import { authenticateSocketToken, AuthenticatedUser } from '../middleware/auth';
+import { authenticateSocketToken, AuthenticatedUser, getSessionCookieToken } from '../middleware/auth';
 import { ChatAttachment, decodeChatMessage } from '../utils/chatMessageContent';
 
 interface ChatMessagePayload {
@@ -166,7 +166,7 @@ export function attachChatSocket(httpServer: HttpServer) {
   });
 
   chatServer.use(async (socket, next) => {
-    const token = socket.handshake.auth?.token;
+    const token = socket.handshake.auth?.token || getSessionCookieToken(socket.handshake.headers.cookie);
     if (typeof token !== 'string') return next(new Error('Authentication required'));
     const user = await authenticateSocketToken(token);
     if (!user) return next(new Error('Authentication required'));

@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
-import { Teacher, SchoolLevel } from '../../types';
-import { Search, Plus, Mail, Phone, BookOpen, GraduationCap, X, Camera, Upload } from 'lucide-react';
+import { Role, Teacher, SchoolLevel } from '../../types';
+import { Search, Plus, Mail, Phone, BookOpen, GraduationCap, X, Camera, Upload, Save, Trash2, Settings } from 'lucide-react';
+import { fetchTeacherAssignmentOptions, saveTeacherAssignments, TeacherAssignmentOptions } from '../../services/api';
 
 interface TeachersTabProps {
   teachers: Teacher[];
   onAddTeacher: (teacher: Teacher) => Promise<void> | void;
   onUpdateTeacher?: (teacher: Teacher) => void;
   onDeleteTeacher?: (id: string) => void;
+  currentUserRole: Role;
 }
 
-export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher }) => {
+export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher, currentUserRole }) => {
   const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -18,6 +20,13 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
   const [teacherAvatarName, setTeacherAvatarName] = useState('');
   const [formError, setFormError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [assignmentTeacher, setAssignmentTeacher] = useState<Teacher | null>(null);
+  const [assignmentOptions, setAssignmentOptions] = useState<TeacherAssignmentOptions | null>(null);
+  const [assignmentType, setAssignmentType] = useState<'class_teacher' | 'subject_teacher'>('subject_teacher');
+  const [assignedClassIds, setAssignedClassIds] = useState<string[]>([]);
+  const [subjectAssignments, setSubjectAssignments] = useState<{ classId: string; subjectId: string }[]>([]);
+  const [assignmentError, setAssignmentError] = useState('');
+  const [isSavingAssignment, setIsSavingAssignment] = useState(false);
   const [newTeacher, setNewTeacher] = useState({
     name: '',
     email: '',
@@ -105,6 +114,43 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
     reader.onerror = () => setFormError('The selected profile photo could not be read.');
     reader.readAsDataURL(file);
   };
+
+  const openAssignments = async (teacher: Teacher) => {
+    setAssignmentTeacher(teacher);
+    setAssignmentError('');
+    setAssignmentOptions(null);
+    try {
+      const options = await fetchTeacherAssignmentOptions();
+      const selected = options.teachers.find(item => item.id === teacher.id);
+      setAssignmentOptions(options);
+      setAssignmentType(selected?.teacherType || teacher.teacherType || 'subject_teacher');
+      setAssignedClassIds(selected?.classIds || []);
+      setSubjectAssignments(selected?.subjectAssignments || []);
+    } catch (error) {
+      setAssignmentError(error instanceof Error ? error.message : 'Could not load teacher assignments.');
+    }
+  };
+
+  const handleSaveAssignments = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!assignmentTeacher) return;
+    setAssignmentError('');
+    setIsSavingAssignment(true);
+    try {
+      await saveTeacherAssignments({
+        teacherId: assignmentTeacher.id,
+        teacherType: assignmentType,
+        classIds: assignmentType === 'class_teacher' ? assignedClassIds : [],
+        subjectAssignments: assignmentType === 'subject_teacher' ? subjectAssignments : [],
+      });
+      setAssignmentTeacher(null);
+    } catch (error) {
+      setAssignmentError(error instanceof Error ? error.message : 'Could not save teacher assignments.');
+    } finally {
+      setIsSavingAssignment(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -162,7 +208,7 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
                   {teacher.subject}
                 </span>
                 <span className="text-[10px] text-slate-500 block">
-                  {teacher.department}
+                  {teacher.teacherType === 'class_teacher' ? 'Class Teacher' : 'Subject Teacher'} · {teacher.department}
                 </span>
               </div>
             </div>
@@ -198,9 +244,123 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
                 ))}
               </div>
             </div>
+            {currentUserRole === 'admin' || currentUserRole === 'owner' || currentUserRole === 'super_admin' ? (
+              <button
+                type="button"
+                onClick={() => void openAssignments(teacher)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+              >
+                <Settings className="h-3.5 w-3.5" /> Assign classes and subjects
+              </button>
+            ) : null}
           </div>
         ))}
       </div>
+
+      {assignmentTeacher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4">
+          <form onSubmit={handleSaveAssignments} className="w-full max-w-2xl space-y-5 rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Teacher assignment</h3>
+                <p className="text-xs text-slate-500">{assignmentTeacher.name}</p>
+              </div>
+              <button type="button" onClick={() => setAssignmentTeacher(null)} aria-label="Close assignments">
+                <X className="h-5 w-5 text-slate-500" />
+              </button>
+            </div>
+            {assignmentError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-xs text-rose-700">{assignmentError}</p>}
+            {!assignmentOptions ? (
+              <p className="py-8 text-center text-sm text-slate-500">Loading classes and subjects…</p>
+            ) : (
+              <>
+                <label className="block space-y-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Teacher type
+                  <select
+                    value={assignmentType}
+                    onChange={event => setAssignmentType(event.target.value as 'class_teacher' | 'subject_teacher')}
+                    className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  >
+                    <option value="class_teacher">Class teacher — attendance and midterm reports</option>
+                    <option value="subject_teacher">Subject teacher — marks for assigned class subjects</option>
+                  </select>
+                </label>
+                {assignmentType === 'class_teacher' ? (
+                  <fieldset className="space-y-2">
+                    <legend className="text-xs font-bold text-slate-700 dark:text-slate-300">Assigned class(es)</legend>
+                    <div className="grid max-h-64 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
+                      {assignmentOptions.classes.map(item => (
+                        <label key={item.id} className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-xs dark:border-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={assignedClassIds.includes(item.id)}
+                            onChange={event => setAssignedClassIds(current =>
+                              event.target.checked ? [...current, item.id] : current.filter(id => id !== item.id)
+                            )}
+                          />
+                          {item.name}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300">Assigned class and subject pairs</h4>
+                      <button
+                        type="button"
+                        onClick={() => setSubjectAssignments(current => [...current, {
+                          classId: assignmentOptions.classes[0]?.id || '',
+                          subjectId: assignmentOptions.subjects[0]?.id || '',
+                        }])}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2 py-1 text-xs dark:border-slate-700"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add
+                      </button>
+                    </div>
+                    {subjectAssignments.map((assignment, index) => (
+                      <div key={`${index}-${assignment.classId}-${assignment.subjectId}`} className="flex gap-2">
+                        <select
+                          aria-label="Assigned class"
+                          value={assignment.classId}
+                          onChange={event => setSubjectAssignments(current => current.map((item, row) =>
+                            row === index ? { ...item, classId: event.target.value } : item
+                          ))}
+                          className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-slate-50 px-2 py-2 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                        >
+                          {assignmentOptions.classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                        </select>
+                        <select
+                          aria-label="Assigned subject"
+                          value={assignment.subjectId}
+                          onChange={event => setSubjectAssignments(current => current.map((item, row) =>
+                            row === index ? { ...item, subjectId: event.target.value } : item
+                          ))}
+                          className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-slate-50 px-2 py-2 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                        >
+                          {assignmentOptions.subjects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                        </select>
+                        <button type="button" aria-label="Remove assignment" onClick={() =>
+                          setSubjectAssignments(current => current.filter((_item, row) => row !== index))
+                        } className="rounded-lg p-2 text-rose-600 hover:bg-rose-50">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                    {!subjectAssignments.length && <p className="text-xs text-slate-500">Add at least one class and subject pair.</p>}
+                  </div>
+                )}
+              </>
+            )}
+            <div className="flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <button type="button" onClick={() => setAssignmentTeacher(null)} className="rounded-xl border px-4 py-2 text-xs font-bold dark:border-slate-700">Cancel</button>
+              <button type="submit" disabled={!assignmentOptions || isSavingAssignment} className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                <Save className="h-4 w-4" /> {isSavingAssignment ? 'Saving…' : 'Save assignments'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Add Teacher Modal */}
       {isAddModalOpen && (

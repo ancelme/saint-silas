@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
 import { db } from '../db/index';
 import { AuthRequest, recordAuditLog } from '../middleware/auth';
 import { isValidProfileImage } from '../utils/profileImage';
@@ -41,7 +42,10 @@ export async function getUsers(req: AuthRequest, res: Response) {
 
 export async function createStaffUser(req: AuthRequest, res: Response) {
   try {
-    const { fullName, email, username, password, role, phone, specialization, department, avatar, studentIds } = req.body;
+    const {
+      fullName, email, username, password, role, phone, specialization, department, avatar, studentIds,
+      teacherType, classIds, subjectAssignments,
+    } = req.body;
 
     if (!fullName || !email || !username || !password || !role) {
       return res.status(400).json({ error: 'Full name, email, username, password, and role are required' });
@@ -54,6 +58,66 @@ export async function createStaffUser(req: AuthRequest, res: Response) {
       return res.status(400).json({
         error: `Invalid role. Permitted roles are: ${PERMITTED_ROLES.join(', ')}`
       });
+    }
+
+    let normalizedClassIds: string[] = [];
+    let normalizedSubjectAssignments: { classId: string; subjectId: string }[] = [];
+    if (role === 'teacher') {
+      if (!['class_teacher', 'subject_teacher'].includes(teacherType)) {
+        return res.status(400).json({ error: 'Choose whether this teacher is a class teacher or subject teacher.' });
+      }
+      if (!Array.isArray(classIds) || classIds.some((id: unknown) => typeof id !== 'string') ||
+          !Array.isArray(subjectAssignments) ||
+          subjectAssignments.some((item: any) =>
+            !item || typeof item.classId !== 'string' || typeof item.subjectId !== 'string')) {
+        return res.status(400).json({ error: 'Teacher class and subject assignments are invalid.' });
+      }
+      normalizedClassIds = [...new Set(classIds as string[])];
+      normalizedSubjectAssignments = [
+        ...new Map((subjectAssignments as { classId: string; subjectId: string }[])
+          .map(item => [`${item.classId}:${item.subjectId}`, item])).values(),
+      ];
+
+      if (teacherType === 'class_teacher' &&
+          (!normalizedClassIds.length || normalizedClassIds.length > 20 || normalizedSubjectAssignments.length)) {
+        return res.status(400).json({ error: 'A class teacher must be assigned to 1–20 classes only.' });
+      }
+      if (teacherType === 'subject_teacher' &&
+          (!normalizedSubjectAssignments.length || normalizedSubjectAssignments.length > 100 || normalizedClassIds.length)) {
+        return res.status(400).json({ error: 'A subject teacher must have 1–100 class-and-subject assignments.' });
+      }
+      const assignedClassIds = teacherType === 'class_teacher'
+        ? normalizedClassIds
+        : [...new Set(normalizedSubjectAssignments.map(item => item.classId))];
+      if (assignedClassIds.length > 20) {
+        return res.status(400).json({ error: 'A teacher cannot be assigned to more than 20 classes.' });
+      }
+      const availableClasses = await db.query(
+        `SELECT id FROM classes WHERE id IN (${assignedClassIds.map(() => '?').join(', ')})`,
+        assignedClassIds,
+      );
+      if (availableClasses.rows.length !== assignedClassIds.length) {
+        return res.status(400).json({ error: 'One or more selected classes are unavailable.' });
+      }
+      if (teacherType === 'class_teacher') {
+        const occupiedClasses = await db.query(
+          `SELECT id FROM classes WHERE id IN (${normalizedClassIds.map(() => '?').join(', ')})
+           AND class_teacher_id IS NOT NULL`,
+          normalizedClassIds,
+        );
+        if (occupiedClasses.rows.length) {
+          return res.status(409).json({ error: 'One or more selected classes already have a class teacher.' });
+        }
+      } else {
+        const subjectIds = [...new Set(normalizedSubjectAssignments.map(item => item.subjectId))];
+        const availableSubjects = await db.query(
+          `SELECT id FROM subjects WHERE id IN (${subjectIds.map(() => '?').join(', ')})`,
+          subjectIds,
+        );
+        if (availableSubjects.rows.length !== subjectIds.length) {
+          return res.status(400).json({ error: 'One or more selected subjects are unavailable.' });
+        }
+      }
     }
 
     const linkedStudentIds = Array.isArray(studentIds)
@@ -110,17 +174,31 @@ export async function createStaffUser(req: AuthRequest, res: Response) {
       const teacherId = `tch-${Date.now()}`;
       const empId = `EMP-SSP-${Math.floor(100 + Math.random() * 900)}`;
       await db.query(
-        `INSERT INTO teachers (id, user_id, employee_id, specialization, qualification, phone, join_date, status)
-         VALUES (?, ?, ?, ?, ?, ?, CURRENT_DATE, 'Active')`,
+        `INSERT INTO teachers (id, user_id, employee_id, teacher_type, specialization, qualification, phone, join_date, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_DATE, 'Active')`,
         [
           teacherId,
           userId,
           empId,
+          teacherType,
           specialization || 'CBC Primary Education',
           department || 'Academic Faculty',
           phone || ''
         ]
       );
+      if (teacherType === 'class_teacher') {
+        for (const classId of normalizedClassIds) {
+          await db.query(`UPDATE classes SET class_teacher_id = ? WHERE id = ?`, [teacherId, classId]);
+        }
+      } else {
+        for (const assignment of normalizedSubjectAssignments) {
+          await db.query(
+            `INSERT INTO teacher_subject_assignments (id, teacher_id, class_id, subject_id)
+             VALUES (?, ?, ?, ?) ON CONFLICT (teacher_id, class_id, subject_id) DO NOTHING`,
+            [`tsa-${createHash('sha256').update(`${teacherId}:${assignment.classId}:${assignment.subjectId}`).digest('hex').slice(0, 32)}`, teacherId, assignment.classId, assignment.subjectId],
+          );
+        }
+      }
     } else if (role === 'parent') {
       const parentId = `par-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
       await db.query(
@@ -154,6 +232,7 @@ export async function createStaffUser(req: AuthRequest, res: Response) {
         email: email.trim().toLowerCase(),
         fullName: fullName.trim(),
         role,
+        teacherType: role === 'teacher' ? teacherType : undefined,
         avatar: avatarUrl,
         status: 'Active',
         mustChangePassword: false,

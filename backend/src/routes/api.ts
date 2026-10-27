@@ -26,10 +26,14 @@ import {
 } from '../controllers/studentsController';
 import {
   getTeachers,
+  getTeacherAssignmentOptions,
+  getMyTeacherAssignments,
+  updateTeacherAssignments,
   createTeacher,
   updateTeacher,
   deleteTeacher
 } from '../controllers/teachersController';
+import { getStudentReports, publishMidtermReports } from '../controllers/reportsController';
 import {
   getAdmissions,
   submitAdmission,
@@ -63,11 +67,13 @@ import {
 } from '../controllers/libraryController';
 import {
   getAttendance,
-  saveAttendance
+  saveAttendance,
+  deleteAttendance,
 } from '../controllers/attendanceController';
 import {
   getGrades,
-  updateGrade
+  updateGrade,
+  deleteGrade,
 } from '../controllers/gradesController';
 import {
   getAnnouncements,
@@ -118,7 +124,7 @@ router.post('/auth/complete-first-login', authenticateToken, completeFirstLogin)
 router.get('/auth/me', authenticateToken, getCurrentUser);
 router.put('/auth/profile', authenticateToken, updateProfile);
 router.post('/auth/change-password', authenticateToken, changePassword);
-router.post('/auth/logout', authenticateToken, logout);
+router.post('/auth/logout', logout);
 router.get('/notifications', authenticateToken, getNotifications);
 router.put('/notifications/:id/read', authenticateToken, markNotificationRead);
 router.get('/timetable', authenticateToken, getTimetable);
@@ -154,7 +160,10 @@ router.put('/students/:id', authenticateToken, requireRole('admin', 'head_teache
 router.delete('/students/:id', authenticateToken, requireRole('admin'), archiveStudent);
 
 router.get('/teachers', authenticateToken, requireRole('admin', 'head_teacher'), getTeachers);
+router.get('/teachers/assignment-options', authenticateToken, requireRole('admin'), getTeacherAssignmentOptions);
+router.get('/teachers/my-assignments', authenticateToken, requireRole('teacher'), getMyTeacherAssignments);
 router.post('/teachers', authenticateToken, requireRole('admin'), createTeacher);
+router.put('/teachers/:id/assignments', authenticateToken, requireRole('admin'), updateTeacherAssignments);
 router.put('/teachers/:id', authenticateToken, requireRole('admin'), updateTeacher);
 router.delete('/teachers/:id', authenticateToken, requireRole('admin'), deleteTeacher);
 
@@ -198,9 +207,13 @@ router.get('/library/summary', authenticateToken, requireRole('admin', 'head_tea
 // ==========================================
 router.get('/attendance', authenticateToken, getAttendance);
 router.post('/attendance', authenticateToken, requireRole('teacher', 'admin', 'head_teacher'), saveAttendance);
+router.delete('/attendance/:id', authenticateToken, requireRole('teacher', 'admin', 'head_teacher'), deleteAttendance);
 
 router.get('/grades', authenticateToken, getGrades);
 router.post('/grades', authenticateToken, requireRole('teacher', 'admin', 'head_teacher'), updateGrade);
+router.delete('/grades/:id', authenticateToken, requireRole('teacher', 'admin', 'head_teacher'), deleteGrade);
+router.get('/reports', authenticateToken, getStudentReports);
+router.post('/reports/midterm/publish', authenticateToken, requireRole('teacher'), publishMidtermReports);
 
 // ==========================================
 // 8. Official Announcements (Full CRUD)

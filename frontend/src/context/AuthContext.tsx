@@ -9,7 +9,6 @@ import {
   logoutUser,
   getSetupStatus,
   setupInitialOwner,
-  hasAuthToken,
   clearAuthToken
 } from '../services/api';
 import { connectChatSocket, disconnectChatSocket } from '../services/chatSocket';
@@ -71,22 +70,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       await checkSystemStatus();
 
-      if (hasAuthToken()) {
-        try {
-          const profile = await getCurrentUser();
-          setUser({
-            ...profile,
-            name: profile.fullName || profile.username,
-          });
-          if (profile.mustChangePassword) {
-            setMustChangePassword(true);
-          }
-        } catch (err) {
-          console.warn('Auth token expired or invalid:', err);
-          clearAuthToken();
-          setUser(null);
-          setMustChangePassword(false);
+      try {
+        const profile = await getCurrentUser();
+        setUser({
+          ...profile,
+          name: profile.fullName || profile.username,
+        });
+        if (profile.mustChangePassword) {
+          setMustChangePassword(true);
         }
+      } catch (err) {
+        console.warn('Auth session expired or invalid:', err);
+        clearAuthToken();
+        setUser(null);
+        setMustChangePassword(false);
       }
       setIsLoading(false);
     };

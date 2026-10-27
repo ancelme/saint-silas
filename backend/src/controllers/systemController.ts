@@ -24,8 +24,11 @@ export async function updateSchoolSetting(req: AuthRequest, res: Response) {
     }
 
     await db.query(
-      `INSERT OR REPLACE INTO school_settings (setting_key, setting_value, updated_at)
-       VALUES (?, ?, CURRENT_TIMESTAMP)`,
+      `INSERT INTO school_settings (setting_key, setting_value, updated_at)
+       VALUES (?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT (setting_key) DO UPDATE SET
+         setting_value = EXCLUDED.setting_value,
+         updated_at = CURRENT_TIMESTAMP`,
       [key, String(value)]
     );
 
@@ -78,7 +81,7 @@ export async function getSystemHealth(req: Request, res: Response) {
       database: {
         engine: dbInfo.engine,
         connected: dbInfo.isConnected,
-        isProductionConfigured: dbInfo.engine === 'mysql'
+        isProductionConfigured: dbInfo.engine === 'postgresql'
       },
       uptime: process.uptime(),
       timestamp: new Date().toISOString()

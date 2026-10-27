@@ -33,10 +33,6 @@ export const SessionsCookiesTab: React.FC<SessionsCookiesTabProps> = ({
   const { t } = useLanguage();
   const { user } = useAuth();
 
-  const [cookieLifetime, setCookieLifetime] = useState<string>(() => {
-    return localStorage.getItem('st_silas_cookie_lifetime') || '24h';
-  });
-
   const [cookieSettings, setCookieSettings] = useState({
     essential: true,
     sessionState: true,
@@ -61,13 +57,6 @@ export const SessionsCookiesTab: React.FC<SessionsCookiesTabProps> = ({
       </div>
     );
   }
-
-  const handleUpdateLifetime = (newLifetime: string) => {
-    setCookieLifetime(newLifetime);
-    localStorage.setItem('st_silas_cookie_lifetime', newLifetime);
-    setToastMsg(`Session and cookie persistence lifetime set to ${newLifetime}.`);
-    setTimeout(() => setToastMsg(null), 3500);
-  };
 
   const handleToggleCookie = (key: keyof typeof cookieSettings) => {
     if (key === 'essential') return; // Cannot toggle essential
@@ -98,7 +87,7 @@ export const SessionsCookiesTab: React.FC<SessionsCookiesTabProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
-              Inspect active bearer tokens, terminate remote sessions, and manage persistent browser cookies for St. Silas portal users.
+              Authentication uses a server-issued HttpOnly cookie with a 30-day expiry. Browser preference toggles below do not change the authentication session.
             </p>
           </div>
         </div>
@@ -217,18 +206,11 @@ export const SessionsCookiesTab: React.FC<SessionsCookiesTabProps> = ({
               <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1.5">
                 Session Persistence & Cookie Lifetime:
               </label>
-              <select
-                value={cookieLifetime}
-                onChange={e => handleUpdateLifetime(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="8h">8 Hours (Standard School Workday)</option>
-                <option value="24h">24 Hours (Daily Authentication)</option>
-                <option value="7d">7 Days (Weekly Persistent Parent Cookie)</option>
-                <option value="30d">30 Days (Extended Term Remember Me)</option>
-              </select>
+              <div className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-white">
+                30 days (set by the server)
+              </div>
               <p className="text-[11px] text-slate-400 mt-1">
-                Controls the Max-Age and Expires headers for user session authentication cookies.
+                The HttpOnly authentication cookie is Secure in production and uses SameSite=Lax.
               </p>
             </div>
 
@@ -245,7 +227,7 @@ export const SessionsCookiesTab: React.FC<SessionsCookiesTabProps> = ({
                     Strictly Necessary Cookies
                   </span>
                   <span className="text-[10px] text-slate-400">
-                    CSRF protection token, 2FA verification gate, session tokens
+                    Required for authentication and sign-in persistence
                   </span>
                 </div>
                 <input
@@ -263,7 +245,7 @@ export const SessionsCookiesTab: React.FC<SessionsCookiesTabProps> = ({
                     User Session & Auth State
                   </span>
                   <span className="text-[10px] text-slate-400">
-                    Maintains user login across browser refreshes and tabs
+                    The server-managed authentication cookie keeps you signed in until it expires or you log out
                   </span>
                 </div>
                 <input
@@ -318,7 +300,7 @@ export const SessionsCookiesTab: React.FC<SessionsCookiesTabProps> = ({
                 <span>Security Cookie Enforcements</span>
               </div>
               <p className="text-[11px] text-emerald-700 dark:text-emerald-400">
-                Enforced with <code>SameSite=Lax</code>, <code>Secure</code> HTTPS encryption flag, and simulated <code>HttpOnly</code> token storage.
+                The authentication cookie is <code>HttpOnly</code>, <code>SameSite=Lax</code>, and <code>Secure</code> on HTTPS production deployments.
               </p>
             </div>
           </div>

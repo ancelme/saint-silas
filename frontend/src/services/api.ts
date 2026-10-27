@@ -14,7 +14,8 @@ import {
   TimetableSlot,
   User,
   Role,
-  UserAuditLog
+  UserAuditLog,
+  StudentMidtermReport,
 } from '../types';
 
 const TOKEN_KEY = 'st_silas_auth_token';
@@ -81,21 +82,9 @@ export function getStoredAuthToken() {
   return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
 }
 
-export function saveAuthToken(token: string, remember: boolean = true) {
-  if (remember) {
-    localStorage.setItem(TOKEN_KEY, token);
-  } else {
-    sessionStorage.setItem(TOKEN_KEY, token);
-  }
-}
-
 export function clearAuthToken() {
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
-}
-
-export function hasAuthToken(): boolean {
-  return !!(localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY));
 }
 
 export async function fetchTimetable() {
@@ -142,6 +131,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const response = await fetch(endpoint, {
     ...options,
     headers,
+    credentials: 'same-origin',
   });
 
   if (!response.ok) {
@@ -167,13 +157,11 @@ export async function setupInitialOwner(payload: {
   phone?: string;
   avatar: string;
 }) {
-  const data = await request<{ message: string; token: string; mustChangePassword: boolean; user: User }>('/api/setup/owner', {
+  const data = await request<{ message: string; mustChangePassword: boolean; user: User }>('/api/setup/owner', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
-  if (data.token) {
-    saveAuthToken(data.token);
-  }
+  clearAuthToken();
   return data;
 }
 
@@ -181,13 +169,11 @@ export async function setupInitialOwner(payload: {
 // 2. Authentication and chat
 // ==========================================
 export async function loginUser(payload: { identifier: string; password: string }) {
-  const data = await request<{ token: string; mustChangePassword?: boolean; user: User }>('/api/auth/login', {
+  const data = await request<{ mustChangePassword?: boolean; user: User }>('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
-  if (data.token) {
-    saveAuthToken(data.token);
-  }
+  clearAuthToken();
   return data;
 }
 
@@ -197,13 +183,11 @@ export async function completeFirstLogin(payload: {
   recoveryEmail: string;
   recoveryPhone: string;
 }) {
-  const data = await request<{ message: string; token: string; user: User }>('/api/auth/complete-first-login', {
+  const data = await request<{ message: string; user: User }>('/api/auth/complete-first-login', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
-  if (data.token) {
-    saveAuthToken(data.token);
-  }
+  clearAuthToken();
   return data;
 }
 
@@ -298,6 +282,9 @@ export async function createStaffUser(payload: {
   department?: string;
   avatar: string;
   studentIds?: string[];
+  teacherType?: 'class_teacher' | 'subject_teacher';
+  classIds?: string[];
+  subjectAssignments?: { classId: string; subjectId: string }[];
 }) {
   return request<{ message: string; user: User }>('/api/users/staff', {
     method: 'POST',
@@ -372,6 +359,53 @@ export async function archiveStudent(id: string) {
 // ==========================================
 export async function fetchTeachers() {
   return request<Teacher[]>('/api/teachers');
+}
+
+export interface TeacherAssignmentOptions {
+  classes: { id: string; name: string }[];
+  subjects: { id: string; name: string }[];
+  teachers: {
+    id: string;
+    fullName: string;
+    teacherType: 'class_teacher' | 'subject_teacher';
+    classIds: string[];
+    subjectAssignments: { classId: string; subjectId: string }[];
+  }[];
+}
+
+export async function fetchTeacherAssignmentOptions() {
+  return request<TeacherAssignmentOptions>('/api/teachers/assignment-options');
+}
+
+export interface MyTeacherAssignments {
+  teacherType: 'class_teacher' | 'subject_teacher';
+  classAssignments: { classId: string; className: string }[];
+  subjectAssignments: {
+    classId: string;
+    className: string;
+    subjectId: string;
+    subjectName: string;
+  }[];
+}
+
+export async function fetchMyTeacherAssignments() {
+  return request<MyTeacherAssignments>('/api/teachers/my-assignments');
+}
+
+export async function saveTeacherAssignments(payload: {
+  teacherId: string;
+  teacherType: 'class_teacher' | 'subject_teacher';
+  classIds: string[];
+  subjectAssignments: { classId: string; subjectId: string }[];
+}) {
+  return request<{ message: string }>(`/api/teachers/${encodeURIComponent(payload.teacherId)}/assignments`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      teacherType: payload.teacherType,
+      classIds: payload.classIds,
+      subjectAssignments: payload.subjectAssignments,
+    }),
+  });
 }
 
 export async function createTeacher(teacher: Partial<Teacher> & { password?: string }) {
@@ -592,9 +626,22 @@ export async function fetchAttendance(date?: string) {
 }
 
 export async function saveAttendance(records: AttendanceRecord[]) {
-  return request<{ message: string }>('/api/attendance', {
+  return request<{
+    message: string;
+    records: { id: string; studentId: string; date: string; subjectId?: string }[];
+  }>('/api/attendance', {
     method: 'POST',
-    body: JSON.stringify({ records }),
+    body: JSON.stringify({
+      records: records.map(({ studentId, date, status, remarks, subjectId }) => ({
+        studentId, date, status, remarks, subjectId,
+      })),
+    }),
+  });
+}
+
+export async function deleteAttendance(attendanceId: string) {
+  return request<{ message: string }>(`/api/attendance/${encodeURIComponent(attendanceId)}`, {
+    method: 'DELETE',
   });
 }
 
@@ -607,6 +654,23 @@ export async function fetchGrades() {
 
 export async function saveGrade(payload: { studentId: string; subject: string; marks: number; remarks?: string }) {
   return request<{ message: string; grade: GradeEntry }>('/api/grades', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteGrade(gradeId: string) {
+  return request<{ message: string }>(`/api/grades/${encodeURIComponent(gradeId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function fetchStudentReports() {
+  return request<StudentMidtermReport[]>('/api/reports');
+}
+
+export async function publishMidtermReports(payload: { period: string; comments: Record<string, string> }) {
+  return request<{ message: string; reports: StudentMidtermReport[] }>('/api/reports/midterm/publish', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -717,6 +781,7 @@ export async function fetchSystemSettings() {
 export async function downloadDatabaseBackup() {
   const token = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
   const response = await fetch('/api/system/backup', {
+    credentials: 'same-origin',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!response.ok) {

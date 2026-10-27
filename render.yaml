@@ -13,7 +13,16 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: st-silas-postgres
+          property: connectionString
       - key: SQLITE_FILE_PATH
         value: /var/data/st_silas.sqlite
       - key: JWT_SECRET
         generateValue: true
+databases:
+  - name: st-silas-postgres
+    databaseName: st_silas_db
+    user: st_silas_user
+    plan: free

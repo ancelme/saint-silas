@@ -30,6 +30,19 @@ export async function getStudents(req: AuthRequest, res: Response) {
       // Find student linked to user email or username
       query += ` AND (LOWER(s.first_name) = LOWER(?) OR LOWER(s.admission_number) = LOWER(?))`;
       params.push(req.user?.username || '', req.user?.username || '');
+    } else if (userRole === 'teacher') {
+      query += ` AND EXISTS (
+        SELECT 1
+        FROM teachers t
+        JOIN classes teacher_class ON teacher_class.class_teacher_id = t.id
+        WHERE t.user_id = ? AND teacher_class.id = s.class_id
+        UNION
+        SELECT 1
+        FROM teachers t
+        JOIN teacher_subject_assignments tsa ON tsa.teacher_id = t.id
+        WHERE t.user_id = ? AND tsa.class_id = s.class_id
+      )`;
+      params.push(userId, userId);
     }
 
     if (status) {
@@ -62,6 +75,7 @@ export async function getStudents(req: AuthRequest, res: Response) {
     // Map to frontend Student model
     const students = result.rows.map(row => ({
       id: row.id,
+      classId: row.class_id,
       rollNo: row.admission_number,
       firstName: row.first_name,
       lastName: row.last_name,

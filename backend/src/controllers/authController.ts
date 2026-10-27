@@ -1,7 +1,15 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../db/index';
-import { generateToken, AuthRequest, recordAuditLog } from '../middleware/auth';
+import {
+  generateToken,
+  setSessionCookie,
+  clearSessionCookie,
+  getSessionCookieToken,
+  authenticateSocketToken,
+  AuthRequest,
+  recordAuditLog,
+} from '../middleware/auth';
 import { isValidProfileImage } from '../utils/profileImage';
 
 const PRIVILEGED_ROLES = ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'accountant', 'librarian'];
@@ -86,10 +94,10 @@ export async function setupInitialOwner(req: Request, res: Response) {
       fullName: cleanFullName,
       mustChangePassword: true
     });
+    setSessionCookie(res, token);
 
     return res.status(201).json({
       message: 'Owner account successfully created. Temporary password must be changed immediately on login.',
-      token,
       mustChangePassword: true,
       user: {
         id: userId,
@@ -119,7 +127,9 @@ export async function login(req: Request, res: Response) {
 
     const cleanIdentifier = identifier.trim().toLowerCase();
     const userRes = await db.query(
-      `SELECT * FROM users WHERE (LOWER(email) = ? OR LOWER(username) = ?) LIMIT 1`,
+      `SELECT u.*, t.teacher_type
+       FROM users u LEFT JOIN teachers t ON t.user_id = u.id
+       WHERE (LOWER(u.email) = ? OR LOWER(u.username) = ?) LIMIT 1`,
       [cleanIdentifier, cleanIdentifier]
     );
 
@@ -177,6 +187,7 @@ export async function login(req: Request, res: Response) {
       fullName: user.full_name,
       mustChangePassword
     });
+    setSessionCookie(res, token);
 
     await recordAuditLog({
       userId: user.id,
@@ -189,7 +200,6 @@ export async function login(req: Request, res: Response) {
     });
 
     return res.json({
-      token,
       mustChangePassword,
       user: {
         id: user.id,
@@ -197,6 +207,7 @@ export async function login(req: Request, res: Response) {
         email: user.email,
         fullName: user.full_name,
         role: user.role,
+        teacherType: user.teacher_type || undefined,
         status: user.status || 'Active',
         mustChangePassword,
         recoveryEmail: user.recovery_email || '',
@@ -284,10 +295,10 @@ export async function completeFirstLogin(req: AuthRequest, res: Response) {
       fullName: dbUser.full_name,
       mustChangePassword: false
     });
+    setSessionCookie(res, token);
 
     return res.json({
       message: 'Permanent password and security recovery method configured successfully. Welcome to St. Silas School System!',
-      token,
       user: {
         id: dbUser.id,
         username: dbUser.username,
@@ -314,8 +325,10 @@ export async function getCurrentUser(req: AuthRequest, res: Response) {
     }
 
     const userRes = await db.query(
-      `SELECT id, username, email, full_name, role, phone, address, district, sector, cell, village, avatar_url, status, must_change_password, recovery_email, recovery_phone, last_login
-       FROM users WHERE id = ?`,
+      `SELECT u.id, u.username, u.email, u.full_name, u.role, u.phone, u.address, u.district, u.sector, u.cell,
+              u.village, u.avatar_url, u.status, u.must_change_password, u.recovery_email, u.recovery_phone,
+              u.last_login, t.teacher_type
+       FROM users u LEFT JOIN teachers t ON t.user_id = u.id WHERE u.id = ?`,
       [req.user.id]
     );
 
@@ -331,6 +344,7 @@ export async function getCurrentUser(req: AuthRequest, res: Response) {
       email: u.email,
       fullName: u.full_name,
       role: u.role,
+      teacherType: u.teacher_type || undefined,
       phone: u.phone,
       address: u.address,
       district: u.district,
@@ -433,11 +447,15 @@ export async function changePassword(req: AuthRequest, res: Response) {
 
 export async function logout(req: AuthRequest, res: Response) {
   try {
-    if (req.user) {
+    clearSessionCookie(res);
+    const bearerToken = req.headers.authorization?.split(' ')[1];
+    const token = bearerToken || getSessionCookieToken(req.headers.cookie);
+    const user = req.user || (token ? await authenticateSocketToken(token) : null);
+    if (user) {
       await recordAuditLog({
-        userId: req.user.id,
-        userName: req.user.fullName,
-        role: req.user.role,
+        userId: user.id,
+        userName: user.fullName,
+        role: user.role,
         action: 'USER_LOGOUT',
         details: 'User logged out and session terminated',
         ipAddress: req.ip

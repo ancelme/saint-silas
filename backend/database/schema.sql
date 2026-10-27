@@ -1,10 +1,8 @@
 -- ===================================================================
 -- ST. SILAS PRIVATE PRIMARY SCHOOL (EAR KIBONDO)
--- PRODUCTION DATABASE SCHEMA (MYSQL 8.0+ COMPATIBLE)
+-- PRODUCTION DATABASE SCHEMA (POSTGRESQL COMPATIBLE)
 -- REB Center Code: 530413 | Gatsibo District, Eastern Province, Rwanda
 -- ===================================================================
-
-SET FOREIGN_KEY_CHECKS = 0;
 
 -- 1. Roles Table (Exactly 8 Main Roles)
 CREATE TABLE IF NOT EXISTS roles (
@@ -48,12 +46,12 @@ CREATE TABLE IF NOT EXISTS users (
   village VARCHAR(100) DEFAULT 'Kibondo',
   avatar_url TEXT,
   status VARCHAR(30) DEFAULT 'Active', -- 'Active', 'Inactive', 'PENDING_FIRST_LOGIN'
-  must_change_password TINYINT(1) DEFAULT 0,
+  must_change_password SMALLINT DEFAULT 0,
   recovery_email VARCHAR(191),
   recovery_phone VARCHAR(50),
   last_login TIMESTAMP NULL,
-  is_active TINYINT(1) DEFAULT 1,
-  email_verified TINYINT(1) DEFAULT 1,
+  is_active SMALLINT DEFAULT 1,
+  email_verified SMALLINT DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -73,7 +71,7 @@ CREATE TABLE IF NOT EXISTS academic_years (
   name VARCHAR(50) NOT NULL UNIQUE,
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,
-  is_current TINYINT(1) DEFAULT 0,
+  is_current SMALLINT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -85,7 +83,7 @@ CREATE TABLE IF NOT EXISTS terms (
   term_number INT NOT NULL,
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,
-  is_current TINYINT(1) DEFAULT 0,
+  is_current SMALLINT DEFAULT 0,
   FOREIGN KEY (academic_year_id) REFERENCES academic_years(id) ON DELETE CASCADE
 );
 
@@ -120,7 +118,26 @@ CREATE TABLE IF NOT EXISTS teachers (
   phone VARCHAR(50),
   join_date DATE,
   status VARCHAR(30) DEFAULT 'Active',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  teacher_type VARCHAR(30) NOT NULL DEFAULT 'subject_teacher',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS teacher_subject_assignments (
+  id VARCHAR(36) PRIMARY KEY,
+  teacher_id VARCHAR(36) NOT NULL,
+  class_id VARCHAR(36) NOT NULL,
+  subject_id VARCHAR(36) NOT NULL,
+  UNIQUE (teacher_id, class_id, subject_id)
+);
+
+CREATE TABLE IF NOT EXISTS student_reports (
+  id VARCHAR(100) PRIMARY KEY,
+  student_id VARCHAR(36) NOT NULL,
+  period VARCHAR(50) NOT NULL,
+  report_json TEXT NOT NULL,
+  teacher_id VARCHAR(36) NOT NULL,
+  published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (student_id, period),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -146,7 +163,7 @@ CREATE TABLE IF NOT EXISTS students (
   admission_number VARCHAR(50) NOT NULL UNIQUE,
   first_name VARCHAR(100) NOT NULL,
   last_name VARCHAR(100) NOT NULL,
-  gender ENUM('M', 'F') NOT NULL,
+  gender VARCHAR(10) NOT NULL,
   date_of_birth DATE NOT NULL,
   class_id VARCHAR(36),
   parent_id VARCHAR(36),
@@ -154,8 +171,8 @@ CREATE TABLE IF NOT EXISTS students (
   grade VARCHAR(50) NOT NULL,
   section VARCHAR(50) DEFAULT 'Alpha',
   enrollment_date DATE NOT NULL,
-  status ENUM('Active', 'Suspended', 'Alumni', 'Archived') DEFAULT 'Active',
-  fee_status ENUM('Paid', 'Partial', 'Pending', 'Overdue') DEFAULT 'Pending',
+  status VARCHAR(30) DEFAULT 'Active',
+  fee_status VARCHAR(20) DEFAULT 'Pending',
   address TEXT,
   photo_url TEXT,
   attendance_rate DECIMAL(5,2) DEFAULT 100.00,
@@ -185,15 +202,19 @@ CREATE TABLE IF NOT EXISTS attendance (
   id VARCHAR(36) PRIMARY KEY,
   student_id VARCHAR(36) NOT NULL,
   class_id VARCHAR(36) NOT NULL,
+  subject_id VARCHAR(36),
   date DATE NOT NULL,
-  status ENUM('Present', 'Absent', 'Late', 'Excused') NOT NULL,
+  status VARCHAR(20) NOT NULL,
   remarks VARCHAR(255),
   recorded_by VARCHAR(36),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
-  FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
-  UNIQUE KEY unique_student_date (student_id, date)
+  FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE
 );
+CREATE UNIQUE INDEX IF NOT EXISTS unique_class_attendance_per_day
+  ON attendance (student_id, date) WHERE subject_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS unique_subject_attendance_per_day
+  ON attendance (student_id, date, subject_id) WHERE subject_id IS NOT NULL;
 
 -- 15. Exams
 CREATE TABLE IF NOT EXISTS exams (
@@ -248,7 +269,7 @@ CREATE TABLE IF NOT EXISTS fees (
   amount_total DECIMAL(10,2) NOT NULL,
   amount_paid DECIMAL(10,2) DEFAULT 0.00,
   balance DECIMAL(10,2) NOT NULL,
-  status ENUM('Paid', 'Partial', 'Pending', 'Overdue') DEFAULT 'Pending',
+  status VARCHAR(20) DEFAULT 'Pending',
   due_date DATE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -324,7 +345,7 @@ CREATE TABLE IF NOT EXISTS announcements (
   content TEXT NOT NULL,
   target_audience VARCHAR(50) DEFAULT 'All', -- All, Parents, Teachers, Students
   category VARCHAR(50) DEFAULT 'Academic',
-  is_published TINYINT(1) DEFAULT 1,
+  is_published SMALLINT DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -335,7 +356,7 @@ CREATE TABLE IF NOT EXISTS messages (
   recipient_id VARCHAR(36) NOT NULL,
   subject VARCHAR(200) NOT NULL,
   body TEXT NOT NULL,
-  is_read TINYINT(1) DEFAULT 0,
+  is_read SMALLINT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -344,7 +365,7 @@ CREATE TABLE IF NOT EXISTS admissions (
   id VARCHAR(36) PRIMARY KEY,
   user_id VARCHAR(36),
   applicant_name VARCHAR(150) NOT NULL,
-  gender ENUM('M', 'F') NOT NULL,
+  gender VARCHAR(10) NOT NULL,
   dob DATE NOT NULL,
   applying_grade VARCHAR(50) NOT NULL,
   level VARCHAR(50) NOT NULL,
@@ -356,7 +377,7 @@ CREATE TABLE IF NOT EXISTS admissions (
   cell VARCHAR(100) DEFAULT 'Simbwa',
   village VARCHAR(100) DEFAULT 'Kibondo',
   previous_school VARCHAR(200),
-  status ENUM('Pending', 'Under Review', 'Approved', 'Rejected') DEFAULT 'Pending',
+  status VARCHAR(30) DEFAULT 'Pending',
   assigned_stream VARCHAR(50),
   admin_response TEXT,
   admin_response_date DATE,
@@ -384,7 +405,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   title VARCHAR(200) NOT NULL,
   message TEXT NOT NULL,
   type VARCHAR(50) DEFAULT 'info',
-  is_read TINYINT(1) DEFAULT 0,
+  is_read SMALLINT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -400,5 +421,3 @@ CREATE INDEX idx_admissions_status ON admissions(status);
 CREATE INDEX idx_audit_created ON audit_logs(created_at);
 CREATE INDEX idx_library_isbn ON library_books(isbn);
 CREATE INDEX idx_borrowing_status ON borrowing_records(status);
-
-SET FOREIGN_KEY_CHECKS = 1;

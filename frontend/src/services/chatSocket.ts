@@ -11,7 +11,6 @@ function startHeartbeat(socket: Socket) {
 
 export function connectChatSocket() {
   const token = getStoredAuthToken();
-  if (!token) return null;
   if (chatSocket) {
     chatSocket.auth = { token };
     if (!chatSocket.connected) chatSocket.connect();
@@ -21,6 +20,7 @@ export function connectChatSocket() {
   chatSocket = io({
     autoConnect: false,
     auth: { token },
+    withCredentials: true,
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,

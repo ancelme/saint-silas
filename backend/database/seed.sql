@@ -5,17 +5,18 @@
 -- ===================================================================
 
 -- 1. Roles
-INSERT IGNORE INTO roles (id, name, display_name, description) VALUES
+INSERT INTO roles (id, name, display_name, description) VALUES
 ('role-owner', 'owner', 'Super Admin / School Owner', 'Full sovereign authority over institutional settings, accounts, academic records, and finances'),
 ('role-admin', 'admin', 'School Administrator', 'Operational management of students, faculty, scheduling, and official records'),
-('role-head-teacher', 'head_teacher', 'Head Teacher (Umuyobozi w\'Ishuri)', 'Academic governance, teacher oversight, pupil admissions, and national exam readiness'),
+('role-head-teacher', 'head_teacher', 'Head Teacher (Umuyobozi w''Ishuri)', 'Academic governance, teacher oversight, pupil admissions, and national exam readiness'),
 ('role-teacher', 'teacher', 'Primary Educator (Mwalimu)', 'Daily classroom roll-call, lesson delivery, assignment grading, and pupil evaluations'),
 ('role-accountant', 'accountant', 'School Bursar / Accountant', 'Tuition billing, payment verification (MTN MoMo), receipts, and fiscal reporting'),
 ('role-parent', 'parent', 'Parent / Guardian (Umubyeyi)', 'Monitors enrolled child progress, attendance notifications, fee statements, and reports'),
-('role-student', 'student', 'Pupil (Umunyeshuri)', 'Views class timetables, learning materials, assignments, and academic reports');
+('role-student', 'student', 'Pupil (Umunyeshuri)', 'Views class timetables, learning materials, assignments, and academic reports')
+ON CONFLICT DO NOTHING;
 
 -- 2. Core Permissions
-INSERT IGNORE INTO permissions (id, code, description, module) VALUES
+INSERT INTO permissions (id, code, description, module) VALUES
 ('perm-all', '*', 'Super administrator sovereign permission', 'system'),
 ('perm-students-view', 'students:view', 'View student roster and details', 'students'),
 ('perm-students-manage', 'students:manage', 'Enroll, edit, and archive students', 'students'),
@@ -25,10 +26,11 @@ INSERT IGNORE INTO permissions (id, code, description, module) VALUES
 ('perm-fees-manage', 'fees:manage', 'Issue invoices, record payments, and audit ledger', 'finance'),
 ('perm-admissions-review', 'admissions:review', 'Review and approve new pupil applications', 'admissions'),
 ('perm-announcements-post', 'announcements:post', 'Publish school circulars and announcements', 'announcements'),
-('perm-audit-view', 'audit:view', 'Inspect security audit logs', 'audit');
+('perm-audit-view', 'audit:view', 'Inspect security audit logs', 'audit')
+ON CONFLICT DO NOTHING;
 
 -- 3. School Institutional Settings
-INSERT IGNORE INTO school_settings (setting_key, setting_value, category, description) VALUES
+INSERT INTO school_settings (setting_key, setting_value, category, description) VALUES
 ('school_name', 'St. Silas Private Primary School', 'general', 'Official legal name of the primary institution'),
 ('school_code', '530413', 'general', 'Rwanda Basic Education Board (REB) Center Code'),
 ('school_motto', 'Knowledge, Character, and Diligence', 'general', 'School official motto'),
@@ -44,20 +46,23 @@ INSERT IGNORE INTO school_settings (setting_key, setting_value, category, descri
 ('tuition_nursery', '45000', 'finance', 'Termly tuition fee for Nursery (RWF)'),
 ('tuition_lower_primary', '55000', 'finance', 'Termly tuition fee for Lower Primary P1-P3 (RWF)'),
 ('tuition_upper_primary', '65000', 'finance', 'Termly tuition fee for Upper Primary P4-P6 (RWF)'),
-('feeding_program_included', 'true', 'general', 'Hot balanced lunch and fresh milk porridge included in fee');
+('feeding_program_included', 'true', 'general', 'Hot balanced lunch and fresh milk porridge included in fee')
+ON CONFLICT DO NOTHING;
 
 -- 4. Current Academic Year
-INSERT IGNORE INTO academic_years (id, name, start_date, end_date, is_current) VALUES
-('ay-2026', 'Academic Year 2026', '2026-01-12', '2026-11-20', 1);
+INSERT INTO academic_years (id, name, start_date, end_date, is_current) VALUES
+('ay-2026', 'Academic Year 2026', '2026-01-12', '2026-11-20', 1)
+ON CONFLICT DO NOTHING;
 
 -- 5. Terms
-INSERT IGNORE INTO terms (id, academic_year_id, name, term_number, start_date, end_date, is_current) VALUES
+INSERT INTO terms (id, academic_year_id, name, term_number, start_date, end_date, is_current) VALUES
 ('term-2026-1', 'ay-2026', 'Term 1', 1, '2026-01-12', '2026-04-03', 0),
 ('term-2026-2', 'ay-2026', 'Term 2', 2, '2026-04-20', '2026-07-24', 1),
-('term-2026-3', 'ay-2026', 'Term 3', 3, '2026-08-31', '2026-11-20', 0);
+('term-2026-3', 'ay-2026', 'Term 3', 3, '2026-08-31', '2026-11-20', 0)
+ON CONFLICT DO NOTHING;
 
 -- 6. Classes (Nursery to P6 Streams)
-INSERT IGNORE INTO classes (id, name, grade_level, stream, capacity) VALUES
+INSERT INTO classes (id, name, grade_level, stream, capacity) VALUES
 ('cls-n1', 'Baby Class (Nursery 1)', 'Nursery', 'Alpha', 35),
 ('cls-n2', 'Middle Class (Nursery 2)', 'Nursery', 'Alpha', 35),
 ('cls-n3', 'Top Class (Nursery 3)', 'Nursery', 'Alpha', 40),
@@ -72,10 +77,11 @@ INSERT IGNORE INTO classes (id, name, grade_level, stream, capacity) VALUES
 ('cls-p5-a', 'Primary 5 Alpha', 'Upper Primary', 'Alpha', 45),
 ('cls-p5-b', 'Primary 5 Beta', 'Upper Primary', 'Beta', 45),
 ('cls-p6-a', 'Primary 6 Alpha (PLE Candidate)', 'Upper Primary', 'Alpha', 45),
-('cls-p6-b', 'Primary 6 Beta (PLE Candidate)', 'Upper Primary', 'Beta', 45);
+('cls-p6-b', 'Primary 6 Beta (PLE Candidate)', 'Upper Primary', 'Beta', 45)
+ON CONFLICT DO NOTHING;
 
 -- 7. REB Competence-Based Curriculum (CBC) Subjects
-INSERT IGNORE INTO subjects (id, code, name, category, grade_level) VALUES
+INSERT INTO subjects (id, code, name, category, grade_level) VALUES
 ('sub-kiny', 'KIN', 'Ikinyarwanda', 'Core', 'All'),
 ('sub-eng', 'ENG', 'English Language', 'Core', 'All'),
 ('sub-math', 'MAT', 'Mathematics', 'Core', 'All'),
@@ -83,4 +89,5 @@ INSERT IGNORE INTO subjects (id, code, name, category, grade_level) VALUES
 ('sub-srs', 'SRS', 'Social and Religious Studies (SRS)', 'Core', 'Upper Primary'),
 ('sub-fre', 'FRE', 'French Language', 'Core', 'Upper Primary'),
 ('sub-art', 'CPA', 'Creative Arts and Physical Education', 'Practical', 'All'),
-('sub-itor', 'ITO', 'Itorero ry\'Ishuri & Rwandan Culture', 'Cultural', 'All');
+('sub-itor', 'ITO', 'Itorero ry''Ishuri & Rwandan Culture', 'Cultural', 'All')
+ON CONFLICT DO NOTHING;

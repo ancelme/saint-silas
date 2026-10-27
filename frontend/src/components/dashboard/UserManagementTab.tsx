@@ -38,7 +38,9 @@ import { User, Role, Student } from '../../types';
 import {
   fetchUsers,
   fetchStudents,
+  fetchTeacherAssignmentOptions,
   createStaffUser,
+  TeacherAssignmentOptions,
   updateUser,
   updateUserStatus,
   updateUserRole,
@@ -62,6 +64,13 @@ export const UserManagementTab: React.FC = () => {
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+  const [teacherOptions, setTeacherOptions] = useState<TeacherAssignmentOptions | null>(null);
+  const [isLoadingTeacherOptions, setIsLoadingTeacherOptions] = useState(false);
+  const [formTeacherType, setFormTeacherType] = useState<'class_teacher' | 'subject_teacher'>('subject_teacher');
+  const [formClassIds, setFormClassIds] = useState<string[]>([]);
+  const [formSubjectAssignments, setFormSubjectAssignments] = useState<{ classId: string; subjectId: string }[]>([
+    { classId: '', subjectId: '' },
+  ]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -143,6 +152,27 @@ export const UserManagementTab: React.FC = () => {
     };
   }, [isCreateModalOpen, formRole]);
 
+  useEffect(() => {
+    if (!isCreateModalOpen || formRole !== 'teacher') return;
+    let isCurrent = true;
+    setIsLoadingTeacherOptions(true);
+    fetchTeacherAssignmentOptions()
+      .then(options => {
+        if (isCurrent) setTeacherOptions(options);
+      })
+      .catch(error => {
+        if (isCurrent) {
+          setToastMsg({ type: 'error', text: error.message || 'Failed to load teacher classes and subjects' });
+        }
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoadingTeacherOptions(false);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [isCreateModalOpen, formRole]);
+
   const handleGeneratePassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$';
     let pwd = 'SS-';
@@ -190,6 +220,15 @@ export const UserManagementTab: React.FC = () => {
       setToastMsg({ type: 'error', text: 'Select at least one student for this parent account' });
       return;
     }
+    if (formRole === 'teacher' && formTeacherType === 'class_teacher' && !formClassIds.length) {
+      setToastMsg({ type: 'error', text: 'Select at least one class for this class teacher' });
+      return;
+    }
+    if (formRole === 'teacher' && formTeacherType === 'subject_teacher' &&
+        (!formSubjectAssignments.length || formSubjectAssignments.some(item => !item.classId || !item.subjectId))) {
+      setToastMsg({ type: 'error', text: 'Select a class and subject for every subject-teacher assignment' });
+      return;
+    }
 
     setIsCreating(true);
     try {
@@ -202,6 +241,11 @@ export const UserManagementTab: React.FC = () => {
         phone: formPhone,
         avatar: formAvatar,
         studentIds: formRole === 'parent' ? selectedStudentIds : undefined,
+        teacherType: formRole === 'teacher' ? formTeacherType : undefined,
+        classIds: formRole === 'teacher' && formTeacherType === 'class_teacher' ? formClassIds : [],
+        subjectAssignments: formRole === 'teacher' && formTeacherType === 'subject_teacher'
+          ? formSubjectAssignments
+          : [],
       });
 
       setCreatedSummary({
@@ -219,6 +263,8 @@ export const UserManagementTab: React.FC = () => {
       setFormAvatar('');
       setFormAvatarFileName('');
       setSelectedStudentIds([]);
+      setFormClassIds([]);
+      setFormSubjectAssignments([{ classId: '', subjectId: '' }]);
       loadUsers();
     } catch (err: any) {
       setToastMsg({ type: 'error', text: err.message || 'Failed to create staff account' });
@@ -736,6 +782,109 @@ export const UserManagementTab: React.FC = () => {
                   ))}
                 </div>
               </div>
+
+              {formRole === 'teacher' && (
+                <fieldset className="rounded-2xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-950/20 p-3 space-y-3">
+                  <legend className="px-1 text-slate-700 dark:text-slate-200 font-bold">Teacher type and teaching assignments</legend>
+                  {isLoadingTeacherOptions ? (
+                    <div className="flex items-center gap-2 py-2 text-slate-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading classes and subjects…
+                    </div>
+                  ) : !teacherOptions?.classes.length ? (
+                    <p className="text-amber-700 dark:text-amber-300">Add a class before creating a teacher account.</p>
+                  ) : (
+                    <>
+                      <select
+                        value={formTeacherType}
+                        onChange={event => setFormTeacherType(event.target.value as 'class_teacher' | 'subject_teacher')}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                      >
+                        <option value="class_teacher">Class teacher — class-wide attendance and reports</option>
+                        <option value="subject_teacher">Subject teacher — subject marks and attendance</option>
+                      </select>
+
+                      {formTeacherType === 'class_teacher' ? (
+                        <div className="space-y-1.5">
+                          <p className="text-[10px] text-slate-500">Choose one or more classes. A class can have only one class teacher.</p>
+                          {teacherOptions.classes.map(item => {
+                            const alreadyAssigned = teacherOptions.teachers.some(teacher =>
+                              teacher.teacherType === 'class_teacher' && teacher.classIds.includes(item.id)
+                            );
+                            const checked = formClassIds.includes(item.id);
+                            return (
+                              <label key={item.id} className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${alreadyAssigned ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-emerald-100 dark:hover:bg-slate-800'}`}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={alreadyAssigned}
+                                  onChange={() => setFormClassIds(current =>
+                                    checked ? current.filter(id => id !== item.id) : [...current, item.id]
+                                  )}
+                                  className="accent-emerald-600"
+                                />
+                                <span className="font-semibold text-slate-700 dark:text-slate-200">
+                                  {item.name}{alreadyAssigned ? ' (class teacher assigned)' : ''}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="text-[10px] text-slate-500">Assign each subject separately for every class this teacher will teach.</p>
+                          {!teacherOptions.subjects.length ? (
+                            <p className="text-amber-700 dark:text-amber-300">Add subjects before creating a subject-teacher account.</p>
+                          ) : formSubjectAssignments.map((assignment, index) => (
+                            <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                              <select
+                                aria-label={`Class assignment ${index + 1}`}
+                                value={assignment.classId}
+                                onChange={event => setFormSubjectAssignments(current => current.map((item, itemIndex) =>
+                                  itemIndex === index ? { ...item, classId: event.target.value } : item
+                                ))}
+                                className="min-w-0 rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                              >
+                                <option value="">Choose class</option>
+                                {teacherOptions.classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                              </select>
+                              <select
+                                aria-label={`Subject assignment ${index + 1}`}
+                                value={assignment.subjectId}
+                                onChange={event => setFormSubjectAssignments(current => current.map((item, itemIndex) =>
+                                  itemIndex === index ? { ...item, subjectId: event.target.value } : item
+                                ))}
+                                className="min-w-0 rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                              >
+                                <option value="">Choose subject</option>
+                                {teacherOptions.subjects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                              </select>
+                              <button
+                                type="button"
+                                aria-label={`Remove assignment ${index + 1}`}
+                                disabled={formSubjectAssignments.length === 1}
+                                onClick={() => setFormSubjectAssignments(current => current.filter((_, itemIndex) => itemIndex !== index))}
+                                className="rounded-lg px-2 text-rose-600 disabled:opacity-30"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                          {!!teacherOptions.subjects.length && (
+                            <button
+                              type="button"
+                              onClick={() => setFormSubjectAssignments(current => [...current, { classId: '', subjectId: '' }])}
+                              className="rounded-lg border border-emerald-300 px-2.5 py-1.5 font-bold text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300"
+                            >
+                              + Add class and subject
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </fieldset>
+              )}
 
               {formRole === 'parent' && (
                 <fieldset className="rounded-2xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/20 p-3">

@@ -20,6 +20,7 @@ export interface User {
   fullName: string;
   name?: string;
   role: Role;
+  teacherType?: 'class_teacher' | 'subject_teacher';
   avatar?: string;
   phone?: string;
   department?: string;
@@ -44,6 +45,7 @@ export interface User {
 
 export interface Student {
   id: string;
+  classId?: string;
   rollNo: string;
   firstName: string;
   lastName: string;
@@ -66,7 +68,9 @@ export interface Student {
 
 export interface Teacher {
   id: string;
+  userId?: string;
   employeeId?: string;
+  teacherType?: 'class_teacher' | 'subject_teacher';
   name: string;
   email: string;
   phone: string;
@@ -76,6 +80,9 @@ export interface Teacher {
   level?: SchoolLevel | 'All';
   qualification: string;
   assignedClasses?: string[];
+  assignedClassIds?: string[];
+  assignedSubjects?: string[];
+  subjectAssignments?: { classId: string; subjectId: string }[];
   assignedGrades?: string[];
   status: 'Active' | 'On Leave' | 'Archived';
   avatar: string;
@@ -101,6 +108,7 @@ export interface AttendanceRecord {
   grade: string;
   level?: SchoolLevel;
   date: string;
+  subjectId?: string;
   status: 'Present' | 'Absent' | 'Late' | 'Excused';
   note?: string;
   remarks?: string;
@@ -127,6 +135,19 @@ export interface GradeEntry {
   finalExamScore?: number;
   totalScore?: number;
   letterGrade?: string;
+}
+
+export interface StudentMidtermReport {
+  id: string;
+  studentId: string;
+  studentName: string;
+  grade: string;
+  period: string;
+  attendance: { present: number; absent: number; late: number; excused: number; total: number };
+  subjects: { subject: string; marks: number; maxMarks: number; grade: string; remarks: string }[];
+  teacherComment: string;
+  teacherName: string;
+  publishedAt: string;
 }
 
 export interface FeeInvoice {

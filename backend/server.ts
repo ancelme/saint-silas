@@ -16,6 +16,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
+let databaseInitialization: Promise<void> | undefined;
 
 if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
   throw new Error(`Invalid PORT value "${process.env.PORT}". PORT must be an integer between 1 and 65535.`);
@@ -215,10 +216,19 @@ app.all('/api/*', (req: Request, res: Response) => {
   res.status(404).json({ error: `API endpoint ${req.method} ${req.originalUrl} not found` });
 });
 
+export function initializeApp() {
+  databaseInitialization ??= db.init().catch(error => {
+    databaseInitialization = undefined;
+    throw error;
+  });
+  return databaseInitialization;
+}
+
+export { app };
+
 async function startServer() {
-  // Initialize Database
   try {
-    await db.init();
+    await initializeApp();
   } catch (err) {
     console.error('Database initialization error:', err);
     throw err;
@@ -248,4 +258,6 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
