@@ -7,3 +7,4 @@ coverage/
 .env*
 !.env.example
 backend/data/*.sqlite*
+backend/server.bundle.mjs
