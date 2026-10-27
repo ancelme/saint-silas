@@ -480,6 +480,9 @@ app.all('/api/*', (req: Request, res: Response) => {
 });
 
 export function initializeApp() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL is required to connect to PostgreSQL.');
+  }
   databaseInitialization ??= db.init().catch(error => {
     databaseInitialization = undefined;
     throw error;
