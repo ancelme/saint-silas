@@ -9,7 +9,7 @@
     "build:backend": "esbuild backend/server.ts --bundle --platform=node --format=esm --packages=external --outfile=backend/server.bundle.mjs",
     "start": "tsx backend/server.ts",
     "preview": "vite preview --config frontend/vite.config.ts",
-    "clean": "node -e "const fs=require('fs'); for (const path of ['frontend/dist','backend/server.js']) fs.rmSync(path,{recursive:true,force:true})"",
+    "clean": "node -e \"const fs=require('fs'); for (const path of ['frontend/dist','backend/server.js']) fs.rmSync(path,{recursive:true,force:true})\"",
     "lint": "tsc --noEmit",
     "migrate:sqlite": "tsx backend/scripts/migrate-sqlite-to-postgres.ts"
   },
