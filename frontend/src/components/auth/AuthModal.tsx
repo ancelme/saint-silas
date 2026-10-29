@@ -34,11 +34,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onSuccess,
 }) => {
   const { t } = useLanguage();
-  const { login, setupOwner, isOwnerConfigured } = useAuth();
+  const { login, setupOwner, isOwnerConfigured, defaultOwnerUsername } = useAuth();
 
-  const [tab, setTab] = useState<'login' | 'setup'>(
-    !isOwnerConfigured ? 'setup' : initialTab
-  );
+  const [tab, setTab] = useState<'login' | 'setup'>(initialTab);
 
   // Form Fields
   const [identifier, setIdentifier] = useState('');
@@ -54,6 +52,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!isOwnerConfigured) {
+      setTab('setup');
+      setUsername(current => current || defaultOwnerUsername);
+      return;
+    }
+    setTab(initialTab);
+  }, [defaultOwnerUsername, initialTab, isOpen, isOwnerConfigured]);
 
   // Remember last logged in identifier for quick daily access
   useEffect(() => {
@@ -330,7 +338,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     First-Run Institutional Setup
                   </p>
                   <p className="text-[11px] leading-relaxed">
-                    Define the real sovereign Owner/Super Administrator credentials. These credentials are saved securely in MySQL with bcrypt hashing and will manage the school system.
+                    Create the school Owner/Super Administrator account. Choose a unique password; it is securely hashed before it is stored in Supabase.
                   </p>
                 </div>
 
@@ -453,7 +461,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Provisioning Owner in MySQL...</span>
+                      <span>                      Creating owner account...</span>
                     </>
                   ) : (
                     <>

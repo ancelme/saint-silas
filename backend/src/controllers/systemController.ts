@@ -81,7 +81,7 @@ export async function getSystemHealth(req: Request, res: Response) {
       database: {
         engine: dbInfo.engine,
         connected: dbInfo.isConnected,
-        isProductionConfigured: dbInfo.engine === 'postgresql'
+        isProductionConfigured: dbInfo.engine === 'supabase'
       },
       uptime: process.uptime(),
       timestamp: new Date().toISOString()

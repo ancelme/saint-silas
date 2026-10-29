@@ -807,6 +807,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                     <p className="text-[11px] text-slate-500">
                       {selectedChild.grade} {selectedChild.section} · {selectedChild.rollNo}
                     </p>
+                    <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                      {selectedChild.status}
+                    </span>
                   </div>
                   <div className="space-y-2 rounded-3xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-800">
                     <div className="flex items-center justify-between">
@@ -831,6 +834,39 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                     <p className="text-[11px] text-slate-500">
                       {selectedChildGrades.length} grade records · {selectedChildFees.length} fee invoices
                     </p>
+                    {selectedChildFees.some(invoice => (invoice.balance ?? invoice.amountTotal - invoice.amountPaid) > 0) && (
+                      <button type="button" onClick={() => onNavigateTab('fees')} className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 dark:text-emerald-300">
+                        Pay school fees <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+              {selectedChild && (
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+                    <div className="flex items-center justify-between"><h3 className="text-sm font-bold text-slate-900 dark:text-white">Recent academic results</h3><Award className="h-5 w-5 text-violet-600" /></div>
+                    {selectedChildGrades.length === 0 ? <p className="mt-4 text-xs text-slate-500">No results have been recorded for this pupil.</p> : (
+                      <div className="mt-3 divide-y divide-slate-100 dark:divide-slate-700">
+                        {selectedChildGrades.slice(0, 5).map(grade => (
+                          <div key={grade.id} className="flex items-center justify-between gap-3 py-3">
+                            <div><p className="text-xs font-bold text-slate-800 dark:text-slate-200">{grade.subject}</p><p className="text-[10px] text-slate-500">{grade.term}</p></div>
+                            <span className="rounded-lg bg-violet-50 px-2.5 py-1 text-xs font-black text-violet-700 dark:bg-violet-950 dark:text-violet-300">{grade.marks}% · {grade.grade}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+                    <div className="flex items-center justify-between"><h3 className="text-sm font-bold text-slate-900 dark:text-white">Attendance summary</h3><CalendarCheck2 className="h-5 w-5 text-teal-600" /></div>
+                    {selectedChildAttendance.length === 0 ? <p className="mt-4 text-xs text-slate-500">No attendance has been recorded for this pupil.</p> : (
+                      <div className="mt-4 grid grid-cols-4 gap-2 text-center">
+                        {(['Present', 'Absent', 'Late', 'Excused'] as const).map(status => {
+                          const count = selectedChildAttendance.filter(record => record.status === status).length;
+                          return <div key={status} className="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900"><p className="text-lg font-black text-slate-900 dark:text-white">{count}</p><p className="text-[10px] text-slate-500">{status}</p></div>;
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

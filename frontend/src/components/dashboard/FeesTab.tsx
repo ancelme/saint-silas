@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { FeeInvoice, FeePaymentRequest, Student } from '../../types';
-import { Wallet, CheckCircle2, X } from 'lucide-react';
+import { Wallet, CheckCircle2, X, Smartphone, Landmark, Banknote, ReceiptText, ShieldCheck } from 'lucide-react';
 import { fetchPaymentRequests, reviewPaymentRequest, submitParentPaymentRequest } from '../../services/api';
 
 type PaymentMethod = 'MTN Mobile Money' | 'Airtel Money' | 'Bank Transfer' | 'Cash';
@@ -49,6 +49,17 @@ export const FeesTab: React.FC<FeesTabProps> = ({ fees, students = [], onRecordP
   const [paymentRequestError, setPaymentRequestError] = useState('');
   const [reviewingRequestId, setReviewingRequestId] = useState('');
   const [feeOverrides, setFeeOverrides] = useState<Record<string, Partial<FeeInvoice>>>({});
+
+  useEffect(() => {
+    if (isParent && students.length && !selectedParentStudent) {
+      const firstStudent = students[0];
+      setSelectedParentStudent(firstStudent.id);
+      setSelectedParentInvoice(visibleFees.find(invoice =>
+        invoice.studentId === firstStudent.id &&
+        (invoice.balance ?? invoice.amountTotal - invoice.amountPaid) > 0
+      )?.id || '');
+    }
+  }, [isParent, students]);
 
   const visibleFees = fees.map(invoice => ({ ...invoice, ...feeOverrides[invoice.id] }));
   const parentInvoices = visibleFees.filter(invoice =>
@@ -185,9 +196,48 @@ export const FeesTab: React.FC<FeesTabProps> = ({ fees, students = [], onRecordP
       </div>
 
       {isParent && (
-        <section className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5 space-y-4">
+        <section className="overflow-hidden rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
+          <div className="bg-gradient-to-r from-emerald-700 to-teal-600 p-5 text-white">
+            <h3 className="text-lg font-bold">My pupils and school fees</h3>
+            <p className="mt-1 text-xs text-emerald-50">View each pupil separately, then submit a payment for verification.</p>
+          </div>
+          <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3">
+            {students.map(student => {
+              const studentFees = visibleFees.filter(invoice => invoice.studentId === student.id);
+              const billed = studentFees.reduce((sum, invoice) => sum + invoice.amountTotal, 0);
+              const paid = studentFees.reduce((sum, invoice) => sum + invoice.amountPaid, 0);
+              const balance = studentFees.reduce((sum, invoice) => sum + (invoice.balance ?? Math.max(0, invoice.amountTotal - invoice.amountPaid)), 0);
+              const selected = selectedParentStudent === student.id;
+              return (
+                <button
+                  key={student.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedParentStudent(student.id);
+                    setSelectedParentInvoice(studentFees.find(invoice => (invoice.balance ?? invoice.amountTotal - invoice.amountPaid) > 0)?.id || '');
+                    setParentPayAmount(0);
+                  }}
+                  className={`rounded-2xl border p-4 text-left transition-all ${selected ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100 dark:bg-emerald-950/30 dark:ring-emerald-900' : 'border-slate-200 bg-slate-50 hover:border-emerald-300 dark:border-slate-700 dark:bg-slate-900'}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-bold text-slate-900 dark:text-white">{student.firstName} {student.lastName}</p>
+                      <p className="mt-1 text-[11px] text-slate-500">{student.grade} · {student.rollNo}</p>
+                    </div>
+                    <Wallet className={`h-5 w-5 ${selected ? 'text-emerald-600' : 'text-slate-400'}`} />
+                  </div>
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                    <div><p className="text-[10px] text-slate-500">Billed</p><p className="mt-1 text-xs font-bold text-slate-800 dark:text-slate-200">{formatRWF(billed)}</p></div>
+                    <div><p className="text-[10px] text-slate-500">Paid</p><p className="mt-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">{formatRWF(paid)}</p></div>
+                    <div><p className="text-[10px] text-slate-500">Balance</p><p className={`mt-1 text-xs font-bold ${balance > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-slate-500'}`}>{formatRWF(balance)}</p></div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <div className="border-t border-slate-200 px-5 py-5 dark:border-slate-700 space-y-4">
           <div>
-            <h3 className="font-bold text-slate-900 dark:text-white">Submit Payment Details</h3>
+            <h3 className="font-bold text-slate-900 dark:text-white">Submit payment details</h3>
             <p className="text-xs text-slate-500 mt-1">
               Select the pupil and invoice this payment is for. The school must verify the payment before the balance changes.
             </p>
@@ -245,19 +295,36 @@ export const FeesTab: React.FC<FeesTabProps> = ({ fees, students = [], onRecordP
             </label>
             {currentParentInvoice && (
               <>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Payment method
-                  <select
-                    value={parentPayMethod}
-                    onChange={e => setParentPayMethod(e.target.value as PaymentMethod)}
-                    className="mt-1 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-3 py-2 text-slate-900 dark:text-white"
-                  >
-                    <option>MTN Mobile Money</option>
-                    <option>Airtel Money</option>
-                    <option>Bank Transfer</option>
-                    <option>Cash</option>
-                  </select>
-                </label>
+                <div className="md:col-span-2 rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900 dark:bg-sky-950/30">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="rounded-xl bg-sky-600 p-2 text-white"><ReceiptText className="h-5 w-5" /></span>
+                      <div><p className="text-xs font-bold text-slate-900 dark:text-white">{currentParentInvoice.invoiceNumber || currentParentInvoice.invoiceNo || currentParentInvoice.id}</p><p className="text-[11px] text-slate-500">{currentParentInvoice.term} · {currentParentInvoice.academicYear}</p></div>
+                    </div>
+                    <div className="text-right"><p className="text-[10px] text-slate-500">Amount remaining</p><p className="text-lg font-black text-sky-700 dark:text-sky-300">{formatRWF(currentParentInvoice.balance ?? currentParentInvoice.amountTotal - currentParentInvoice.amountPaid)}</p></div>
+                  </div>
+                </div>
+                <fieldset className="md:col-span-2">
+                  <legend className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-300">Payment method</legend>
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    {([
+                      ['MTN Mobile Money', Smartphone, 'Mobile Money'],
+                      ['Airtel Money', Smartphone, 'Mobile Money'],
+                      ['Bank Transfer', Landmark, 'Bank account'],
+                      ['Cash', Banknote, 'School office'],
+                    ] as const).map(([method, Icon, hint]) => (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => setParentPayMethod(method as PaymentMethod)}
+                        className={`flex min-h-20 items-center gap-3 rounded-2xl border p-3 text-left transition-all ${parentPayMethod === method ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-100 dark:bg-emerald-950/30 dark:ring-emerald-900' : 'border-slate-200 bg-slate-50 hover:border-emerald-300 dark:border-slate-700 dark:bg-slate-900'}`}
+                      >
+                        <span className={`rounded-xl p-2 ${parentPayMethod === method ? 'bg-emerald-600 text-white' : 'bg-white text-slate-500 dark:bg-slate-800'}`}><Icon className="h-5 w-5" /></span>
+                        <span><span className="block text-xs font-bold text-slate-900 dark:text-white">{method}</span><span className="mt-1 block text-[10px] text-slate-500">{hint}</span></span>
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Amount paid (RWF)
                   <input
@@ -309,6 +376,7 @@ export const FeesTab: React.FC<FeesTabProps> = ({ fees, students = [], onRecordP
           {students.length === 0 && (
             <p className="text-xs text-amber-700">No pupils are linked to your parent account yet. Contact the school administrator.</p>
           )}
+          </div>
         </section>
       )}
 

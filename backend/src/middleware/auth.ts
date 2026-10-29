@@ -169,6 +169,20 @@ export function requireRole(...allowedRoles: string[]) {
   };
 }
 
+export function requireAccountCreator(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthenticated' });
+  }
+
+  if (req.user.role !== 'owner' && req.user.role !== 'admin') {
+    return res.status(403).json({
+      error: 'Forbidden: Only the School Owner or an Administrator can create and manage school users.'
+    });
+  }
+
+  next();
+}
+
 export function requireOwnerOnly(req: AuthRequest, res: Response, next: NextFunction) {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthenticated' });

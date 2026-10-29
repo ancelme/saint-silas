@@ -1,4 +1,7 @@
 import { Pool, type QueryResultRow } from 'pg';
+import fs from 'fs';
+import path from 'path';
+import initSqlJs, { type Database as SqlJsDatabase } from 'sql.js';
 
 function toPostgresPlaceholders(sql: string): string {
   let converted = '';
@@ -37,29 +40,71 @@ export interface QueryResult<T = any> {
 }
 
 class DatabaseManager {
-  private postgresPool: Pool | null = null;
+  private databasePool: Pool | null = null;
+  private sqliteDatabase: SqlJsDatabase | null = null;
+  private sqliteFilePath: string | null = null;
+  private databaseEngine: 'supabase' | 'sqlite' = 'supabase';
   private isInitialized = false;
 
   async init(): Promise<void> {
     if (this.isInitialized) return;
 
-    const connectionString = process.env.DATABASE_URL;
+    const connectionString = process.env.SUPABASE_DB_URL;
     if (!connectionString) {
-      throw new Error('DATABASE_URL is required to connect to PostgreSQL.');
+      this.databaseEngine = 'sqlite';
+      this.sqliteFilePath = process.env.SQLITE_FILE_PATH
+        ? path.resolve(process.env.SQLITE_FILE_PATH)
+        : path.resolve(process.cwd(), 'backend', 'data', 'st_silas.sqlite');
+      if (!fs.existsSync(this.sqliteFilePath)) {
+        throw new Error(`SQLite database file not found: ${this.sqliteFilePath}`);
+      }
+      const SQL = await initSqlJs({
+        locateFile: file => path.resolve(process.cwd(), 'node_modules', 'sql.js', 'dist', file),
+      });
+      this.sqliteDatabase = new SQL.Database(new Uint8Array(fs.readFileSync(this.sqliteFilePath)));
+      await this.runSqliteMigrations();
+      this.isInitialized = true;
+      console.log(`✅ [DB] Connected to local SQLite database: ${this.sqliteFilePath}`);
+      return;
     }
 
+    this.databaseEngine = 'supabase';
     const pool = new Pool({ connectionString });
     try {
       await pool.query('SELECT 1');
-      this.postgresPool = pool;
-      console.log('✅ [DB] Connected to PostgreSQL database successfully.');
+      this.databasePool = pool;
+      console.log('✅ [DB] Connected to Supabase database successfully.');
     } catch (error) {
       await pool.end();
-      throw new Error('Failed to connect to PostgreSQL.', { cause: error });
+      throw new Error('Failed to connect to Supabase.', { cause: error });
     }
 
     await this.runBootstrapMigrations();
     this.isInitialized = true;
+  }
+
+  private async runSqliteMigrations(): Promise<void> {
+    await this.query(`CREATE TABLE IF NOT EXISTS teacher_subject_assignments (
+      id VARCHAR(36) PRIMARY KEY,
+      teacher_id VARCHAR(36) NOT NULL,
+      class_id VARCHAR(36) NOT NULL,
+      subject_id VARCHAR(36) NOT NULL,
+      UNIQUE (teacher_id, class_id, subject_id)
+    )`);
+    await this.query(`CREATE TABLE IF NOT EXISTS student_reports (
+      id VARCHAR(100) PRIMARY KEY,
+      student_id VARCHAR(36) NOT NULL,
+      period VARCHAR(50) NOT NULL,
+      report_json TEXT NOT NULL,
+      teacher_id VARCHAR(36) NOT NULL,
+      published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (student_id, period)
+    )`);
+
+    const teacherColumns = await this.query<{ name: string }>(`PRAGMA table_info(teachers)`);
+    if (!teacherColumns.rows.some(({ name }) => name === 'teacher_type')) {
+      await this.query(`ALTER TABLE teachers ADD COLUMN teacher_type VARCHAR(30) NOT NULL DEFAULT 'subject_teacher'`);
+    }
   }
 
   private async runBootstrapMigrations(): Promise<void> {
@@ -580,17 +625,33 @@ class DatabaseManager {
   }
 
   async query<T = any>(sql: string, params: any[] = []): Promise<QueryResult<T>> {
-    if (!this.postgresPool) {
-      throw new Error('Database not initialized');
+    if (this.databaseEngine === 'sqlite') {
+      if (!this.sqliteDatabase) throw new Error('Database not initialized');
+
+      const normalizedSql = sql.replace(/\$([1-9][0-9]*)/g, '?');
+      const statement = normalizedSql.trim().toUpperCase();
+      if (/^(SELECT|WITH|PRAGMA|EXPLAIN)/.test(statement)) {
+        const result = this.sqliteDatabase.exec(normalizedSql, params);
+        if (!result.length) return { rows: [], affectedRows: 0 };
+        const rows = result[0].values.map(values => Object.fromEntries(result[0].columns.map((column, index) => [column, values[index]]))) as unknown as T[];
+        return { rows, affectedRows: 0 };
+      }
+
+      this.sqliteDatabase.run(normalizedSql, params);
+      if (this.sqliteFilePath) {
+        fs.writeFileSync(this.sqliteFilePath, Buffer.from(this.sqliteDatabase.export()));
+      }
+      return { rows: [], affectedRows: this.sqliteDatabase.getRowsModified() };
     }
 
-    const result = await this.postgresPool.query<T & QueryResultRow>(toPostgresPlaceholders(sql), params);
+    if (!this.databasePool) throw new Error('Database not initialized');
+    const result = await this.databasePool.query<T & QueryResultRow>(toPostgresPlaceholders(sql), params);
     return { rows: result.rows, affectedRows: result.rowCount ?? 0 };
   }
 
-  getDatabaseEngine(): { engine: 'postgresql'; isConnected: boolean } {
+  getDatabaseEngine(): { engine: 'supabase' | 'sqlite'; isConnected: boolean } {
     return {
-      engine: 'postgresql',
+      engine: this.databaseEngine,
       isConnected: this.isInitialized,
     };
   }
@@ -603,7 +664,7 @@ class DatabaseManager {
   async generateSqlBackup(): Promise<string> {
     const dumpLines: string[] = [
       `-- =============================================================`,
-      `-- ST. SILAS PRIVATE PRIMARY SCHOOL - POSTGRESQL DATA BACKUP`,
+      `-- ST. SILAS PRIVATE PRIMARY SCHOOL - SUPABASE DATA BACKUP`,
       `-- Exported on: ${new Date().toISOString()}`,
       `-- =============================================================`,
     ];
@@ -613,7 +674,8 @@ class DatabaseManager {
       'classes', 'subjects', 'users', 'teachers', 'parents', 'students',
       'parent_students', 'enrollments', 'attendance', 'exams', 'marks', 'assignments', 'fees',
       'payments', 'expenses', 'library_books', 'borrowing_records',
-      'announcements', 'messages', 'admissions', 'audit_logs', 'notifications'
+      'announcements', 'messages', 'admissions', 'audit_logs', 'notifications',
+      'teacher_subject_assignments', 'student_reports'
     ];
 
     for (const table of tables) {

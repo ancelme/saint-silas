@@ -3,6 +3,31 @@ import { createHash } from 'crypto';
 import { db } from '../db/index';
 import { AuthRequest, recordAuditLog } from '../middleware/auth';
 
+async function notifyParentsAndClassTeacher(studentId: string, subject: string, details: string, senderId: string) {
+  const recipients = await db.query(
+    `SELECT DISTINCT recipient_id FROM (
+       SELECT ct.user_id AS recipient_id FROM students s
+       JOIN classes c ON c.id = s.class_id JOIN teachers ct ON ct.id = c.class_teacher_id
+       WHERE s.id = ? AND ct.user_id IS NOT NULL
+       UNION
+       SELECT p.user_id AS recipient_id FROM students s JOIN parents p ON p.id = s.parent_id WHERE s.id = ? AND p.user_id IS NOT NULL
+       UNION
+       SELECT p.user_id AS recipient_id FROM parent_students ps JOIN parents p ON p.id = ps.parent_id WHERE ps.student_id = ? AND p.user_id IS NOT NULL
+     )`,
+    [studentId, studentId, studentId],
+  );
+  const recipientIds = recipients.rows.map(row => row.recipient_id).filter(Boolean);
+  for (const recipientId of recipientIds) {
+    const id = `msg-${createHash('sha256').update(`${studentId}:${subject}:${recipientId}:${details}`).digest('hex').slice(0, 32)}`;
+    await db.query(
+      `INSERT INTO messages (id, sender_id, recipient_id, subject, body, is_read)
+       VALUES (?, ?, ?, ?, ?, 0)
+       ON CONFLICT (id) DO UPDATE SET body = EXCLUDED.body, is_read = 0, created_at = CURRENT_TIMESTAMP`,
+      [id, senderId, recipientId, `${subject} update`, details],
+    );
+  }
+}
+
 export async function getGrades(req: AuthRequest, res: Response) {
   try {
     const userRole = req.user?.role;
@@ -163,6 +188,13 @@ export async function updateGrade(req: AuthRequest, res: Response) {
       const avg = allMarks.rows.reduce((sum: number, r: any) => sum + Number(r.score), 0) / allMarks.rows.length;
       await db.query(`UPDATE students SET overall_gpa = ? WHERE id = ?`, [Math.round(avg * 10) / 10, studentId]);
     }
+
+    await notifyParentsAndClassTeacher(
+      studentId,
+      subject.trim(),
+      `${subject.trim()} marks were updated for your pupil: ${numMarks}% (${letterGrade}). Remarks: ${remarks || 'Evaluated'}.`,
+      req.user?.id || 'sys',
+    );
 
     await recordAuditLog({
       userId: req.user?.id,

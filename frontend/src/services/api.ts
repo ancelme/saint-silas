@@ -669,7 +669,7 @@ export async function fetchStudentReports() {
   return request<StudentMidtermReport[]>('/api/reports');
 }
 
-export async function publishMidtermReports(payload: { period: string; comments: Record<string, string> }) {
+export async function publishMidtermReports(payload: { period: string; classId: string; comments: Record<string, string> }) {
   return request<{ message: string; reports: StudentMidtermReport[] }>('/api/reports/midterm/publish', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -776,6 +776,13 @@ export async function sendContactInquiry(payload: {
 // ==========================================
 export async function fetchSystemSettings() {
   return request<Record<string, string>>('/api/system/settings');
+}
+
+export async function updateSystemSetting(key: string, value: string) {
+  return request<{ message: string }>('/api/system/settings', {
+    method: 'PUT',
+    body: JSON.stringify({ key, value }),
+  });
 }
 
 export async function downloadDatabaseBackup() {

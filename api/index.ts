@@ -29,11 +29,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (res.headersSent) {
       return;
     }
-    const databaseUrlMissing = error instanceof Error
-      && error.message === 'DATABASE_URL is required to connect to PostgreSQL.';
+    const supabaseUrlMissing = error instanceof Error
+      && error.message === 'SUPABASE_DB_URL is required to connect to Supabase.';
     return res.status(500).json({
-      error: databaseUrlMissing
-        ? 'Database configuration is missing.'
+      error: supabaseUrlMissing
+        ? 'Supabase database configuration is missing.'
         : 'The API could not initialize. Check the Vercel function logs.'
     });
   }

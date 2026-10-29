@@ -134,6 +134,21 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
   const handleSaveAssignments = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!assignmentTeacher) return;
+    if (assignmentType === 'class_teacher' && assignedClassIds.length === 0) {
+      setAssignmentError('Select at least one class for a class teacher.');
+      return;
+    }
+    if (assignmentType === 'subject_teacher') {
+      if (!subjectAssignments.length || subjectAssignments.some(item => !item.classId || !item.subjectId)) {
+        setAssignmentError('Select a class and subject for every assignment row.');
+        return;
+      }
+      const keys = subjectAssignments.map(item => `${item.classId}:${item.subjectId}`);
+      if (new Set(keys).size !== keys.length) {
+        setAssignmentError('Duplicate class and subject pairs are not allowed.');
+        return;
+      }
+    }
     setAssignmentError('');
     setIsSavingAssignment(true);
     try {
@@ -277,6 +292,7 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
                 <label className="block space-y-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Teacher type
                   <select
+                    required
                     value={assignmentType}
                     onChange={event => setAssignmentType(event.target.value as 'class_teacher' | 'subject_teacher')}
                     className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
@@ -321,6 +337,7 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
                     {subjectAssignments.map((assignment, index) => (
                       <div key={`${index}-${assignment.classId}-${assignment.subjectId}`} className="flex gap-2">
                         <select
+                          required
                           aria-label="Assigned class"
                           value={assignment.classId}
                           onChange={event => setSubjectAssignments(current => current.map((item, row) =>
@@ -331,6 +348,7 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
                           {assignmentOptions.classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                         </select>
                         <select
+                          required
                           aria-label="Assigned subject"
                           value={assignment.subjectId}
                           onChange={event => setSubjectAssignments(current => current.map((item, row) =>
@@ -450,6 +468,7 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
                     Education Level
                   </label>
                   <select
+                    required
                     value={newTeacher.level}
                     onChange={e => setNewTeacher({ ...newTeacher, level: e.target.value as any })}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -467,6 +486,7 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
                   Department
                 </label>
                 <select
+                  required
                   value={newTeacher.department}
                   onChange={e => setNewTeacher({ ...newTeacher, department: e.target.value })}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"

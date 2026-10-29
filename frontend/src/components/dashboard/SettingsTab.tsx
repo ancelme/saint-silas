@@ -17,6 +17,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import {
   fetchSystemSettings,
+  updateSystemSetting,
   downloadDatabaseBackup,
   getSystemHealth
 } from '../../services/api';
@@ -68,6 +69,21 @@ export const SettingsTab: React.FC = () => {
       setTimeout(() => setToastMsg(null), 4000);
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleSaveSchoolParameters = async () => {
+    if (!['owner', 'super_admin', 'admin'].includes(user?.role || '')) return;
+    setIsSavingSettings(true);
+    try {
+      const keys = ['tuition_nursery', 'tuition_lower_primary', 'tuition_upper_primary', 'term_1_dates', 'term_2_dates', 'term_3_dates'];
+      await Promise.all(keys.map(key => updateSystemSetting(key, settings[key] || '')));
+      setToastMsg({ type: 'success', text: 'School fees and academic term dates updated.' });
+      setTimeout(() => setToastMsg(null), 4000);
+    } catch (error: any) {
+      setToastMsg({ type: 'error', text: error.message || 'Failed to save school parameters.' });
+    } finally {
+      setIsSavingSettings(false);
     }
   };
 
@@ -237,20 +253,53 @@ export const SettingsTab: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 pt-2">
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-850 text-center">
-                <span className="text-[10px] text-slate-400 font-bold block">Nursery Fee</span>
-                <span className="text-xs font-bold text-emerald-600">45,000 RWF</span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-850 text-center">
-                <span className="text-[10px] text-slate-400 font-bold block">Lower Primary</span>
-                <span className="text-xs font-bold text-emerald-600">55,000 RWF</span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-850 text-center">
-                <span className="text-[10px] text-slate-400 font-bold block">Upper Primary</span>
-                <span className="text-xs font-bold text-emerald-600">65,000 RWF</span>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
+              {[
+                ['tuition_nursery', 'Nursery Fee', settings.tuition_nursery || '45000'],
+                ['tuition_lower_primary', 'Lower Primary', settings.tuition_lower_primary || '55000'],
+                ['tuition_upper_primary', 'Upper Primary', settings.tuition_upper_primary || '65000'],
+              ].map(([key, label, fallback]) => (
+                <label key={key} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-850 block">
+                  <span className="text-[10px] text-slate-400 font-bold block mb-1">{label}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={settings[key] ?? fallback}
+                    onChange={event => setSettings(previous => ({ ...previous, [key]: event.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1.5 text-xs font-bold text-emerald-600"
+                  />
+                </label>
+              ))}
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
+              {[
+                ['term_1_dates', 'Term 1 Dates', 'Sept 08 - Dec 19'],
+                ['term_2_dates', 'Term 2 Dates', 'Jan 05 - Apr 03'],
+                ['term_3_dates', 'Term 3 Dates', 'Apr 20 - Jul 10'],
+              ].map(([key, label, fallback]) => (
+                <label key={key} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-850 block">
+                  <span className="text-[10px] text-slate-400 font-bold block mb-1">{label}</span>
+                  <input
+                    type="text"
+                    value={settings[key] ?? fallback}
+                    onChange={event => setSettings(previous => ({ ...previous, [key]: event.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1.5 text-xs"
+                  />
+                </label>
+              ))}
+            </div>
+            {['owner', 'super_admin', 'admin'].includes(user?.role || '') && (
+              <button
+                type="button"
+                onClick={handleSaveSchoolParameters}
+                disabled={isSavingSettings}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+              >
+                {isSavingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Save fees and academic dates
+              </button>
+            )}
           </div>
         </div>
 

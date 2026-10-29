@@ -11,7 +11,7 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const sqlitePath = path.resolve(
   process.argv[2] || process.env.SQLITE_FILE_PATH || path.resolve(scriptDirectory, '..', 'data', 'st_silas.sqlite'),
 );
-const connectionString = process.env.DATABASE_URL;
+const connectionString = process.env.SUPABASE_DB_URL;
 
 const applicationTables = [
   'users',
@@ -42,9 +42,9 @@ function quoteIdentifier(identifier: string): string {
   return `"${identifier.replace(/"/g, '""')}"`;
 }
 
-async function migrateSqliteToPostgres() {
+async function migrateSqliteToSupabase() {
   if (!connectionString) {
-    throw new Error('DATABASE_URL must be set to the destination PostgreSQL database.');
+    throw new Error('SUPABASE_DB_URL must be set to the destination Supabase database.');
   }
   if (!fs.existsSync(sqlitePath)) {
     throw new Error(`SQLite source file not found: ${sqlitePath}`);
@@ -62,7 +62,7 @@ async function migrateSqliteToPostgres() {
     const schemaResult = await databaseClient.query<{ schema_name: string }>('SELECT current_schema() AS schema_name');
     const schemaName = schemaResult.rows[0]?.schema_name;
     if (!schemaName) {
-      throw new Error('Could not determine the PostgreSQL schema for the migration.');
+      throw new Error('Could not determine the Supabase database schema for the migration.');
     }
 
     const targetTableResult = await databaseClient.query<{ table_name: string }>(
@@ -73,7 +73,7 @@ async function migrateSqliteToPostgres() {
     );
     const targetTables = new Set(targetTableResult.rows.map((row: { table_name: string }) => row.table_name));
     if (!targetTables.has('users')) {
-      throw new Error('PostgreSQL schema is not initialized. Start the application successfully before migrating.');
+      throw new Error('Supabase schema is not initialized. Start the application successfully before migrating.');
     }
 
     await databaseClient.query('BEGIN');
@@ -93,7 +93,7 @@ async function migrateSqliteToPostgres() {
       );
       if (Number(countResult.rows[0]?.count || 0) > 0) {
         throw new Error(
-          `PostgreSQL already contains application records in "${table}". No data was imported; use an empty destination database.`,
+          `Supabase already contains application records in "${table}". No data was imported; use an empty destination database.`,
         );
       }
     }
@@ -160,7 +160,7 @@ async function migrateSqliteToPostgres() {
   }
 }
 
-migrateSqliteToPostgres().catch((error: unknown) => {
+migrateSqliteToSupabase().catch((error: unknown) => {
   console.error('[Migration] Failed:', error);
   process.exitCode = 1;
 });

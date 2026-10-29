@@ -6,14 +6,17 @@ This repository contains the St. Silas Private Primary School management system.
 ## Project structure
 
 - `frontend/` contains the React application, static assets, and Vite configuration.
-- `backend/` contains the Express API and PostgreSQL database setup.
+- `backend/` contains the Express API and Supabase database setup.
 - The root `package.json` provides the scripts for both applications.
 
 ## Run locally
 
 **Prerequisites:** Node.js
 
-1. Create a PostgreSQL database and set `DATABASE_URL` in `.env` to its connection URL.
+1. Create a Supabase project, copy its PostgreSQL connection string from the
+   Supabase dashboard, and set `SUPABASE_DB_URL` in `.env`. For serverless
+   deployments, use the Supabase connection pooler URL and include
+   `sslmode=require`.
 2. Install dependencies from the repository root:
    ```powershell
    npm install
@@ -55,7 +58,7 @@ and assign a subject for each class. Assignments can also be updated later from
 the Teachers directory. Class teachers manage class-wide attendance and publish
 midterm reports. Subject teachers can view pupils only in their assigned classes
 and create, edit, or delete marks and attendance records for their assigned
-class-subject pairs. Published reports are stored in PostgreSQL and appear in
+class-subject pairs. Published reports are stored in Supabase and appear in
 linked parents' Reports section; parents also receive an in-app message.
 
 ## Build for production
@@ -68,55 +71,49 @@ npm start
 
 ## Deploy to Render
 
-This project includes a Render Blueprint in `render.yaml`. It connects the Node
-web service to a Render PostgreSQL database using `DATABASE_URL`. The database
-is configured on Render's free plan, which is temporary and must not be used for
-permanent school records. Select a paid PostgreSQL plan in Render for durable
-production storage.
+This project includes a Render Blueprint in `render.yaml` for the Node web
+service. The Supabase database is managed separately; add its connection string
+as the `SUPABASE_DB_URL` environment variable in Render.
 
 1. Push this project to a GitHub or GitLab repository. Keep `.env` files and
    database files out of the repository.
 2. In Render, choose **New +** → **Blueprint**, connect the repository, and
    select the branch containing `render.yaml`.
-3. Review the Blueprint and create the service and PostgreSQL database. Render generates a
+3. Review the Blueprint and create the web service. Render generates a
    `JWT_SECRET`; keep it private and do not rotate it after users have logged
    in, because existing sessions use it.
-4. Existing records in the former SQLite database are not copied automatically.
-   Keep the existing disk and make a backup. After the PostgreSQL-backed service
-   is healthy, run `npm run migrate:sqlite` in the Render shell to import the
-   SQLite file at `/var/data/st_silas.sqlite`. The migration stops if it finds
-   application records already in PostgreSQL, imports in a transaction, skips
-   duplicate keys, and does not modify the SQLite source. Review the per-table
-   import counts before using the new database. For a local SQLite file, set
-   `DATABASE_URL` and run
-   `npm run migrate:sqlite -- backend/data/st_silas.sqlite`.
-5. Complete owner setup only if the migrated PostgreSQL database has no owner
+4. Existing records in the SQLite database are not copied automatically. Back
+   up the source file, set `SUPABASE_DB_URL` locally, start the app once to
+   initialize the Supabase schema, then run
+   `npm run migrate:sqlite:supabase -- backend/data/st_silas.sqlite`. The
+   migration stops if it finds application records already in Supabase,
+   imports in a transaction, skips duplicate keys, and does not modify the
+   SQLite source. Review the per-table import counts before using the data.
+5. Complete owner setup only if the Supabase database has no owner
    account. An empty database makes the site show first-time owner registration
    again; this is separate from a browser sign-in session expiring.
 6. Optionally add `GEMINI_API_KEY` in the Render service's environment settings
    to enable Gemini-powered features. Set `APP_URL` to the deployed service URL
    if using integrations that need the public application address.
 
-Back up the PostgreSQL database regularly. Voice recording in browsers
-requires HTTPS; Render provides HTTPS on the service URL. The current Render
-PostgreSQL `free` plan is temporary and cannot guarantee permanent retention.
-Keep verified backups and move to a paid PostgreSQL plan before relying on it
-for permanent school records. Authentication uses a server-issued HttpOnly
-cookie that expires after 30 days; this controls sign-in persistence, not data
-retention.
+Back up the Supabase database regularly. Voice recording in browsers requires
+HTTPS; Render provides HTTPS on the service URL. Authentication uses a
+server-issued HttpOnly cookie that expires after 30 days; this controls
+sign-in persistence, not data retention.
 
 ## Deploy to Vercel
 
 Vercel serves the Vite frontend from `frontend/dist` and routes `/api/*` to the
-Express handler in `api/[...path].ts`. Add `DATABASE_URL` (the Neon PostgreSQL
-connection string) and a strong `JWT_SECRET` to the Vercel project's Production
-environment variables, then deploy the `main` branch. The `/api` routes require
-those variables at runtime. Vercel Functions do not host the Socket.IO server,
-so realtime chat sockets require a separate WebSocket-capable service.
+Express handler in `api/[...path].ts`. Add `SUPABASE_DB_URL` (the Supabase
+PostgreSQL connection pooler string) and a strong `JWT_SECRET` to the Vercel
+project's Production environment variables, then deploy the `main` branch. The
+`/api` routes require those variables at runtime. Vercel Functions do not host
+the Socket.IO server, so realtime chat sockets require a separate
+WebSocket-capable service.
 
 ### Running without internet
 
-The app requires a reachable PostgreSQL database. Install dependencies with
+The app requires a reachable Supabase database. Install dependencies with
 `npm install` while online before disconnecting; startup does not need internet
 once the dependencies are present. Gemini AI, Google Maps, Google Fonts, and
 remotely hosted Unsplash photos do require internet and will be unavailable or

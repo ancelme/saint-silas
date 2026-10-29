@@ -13,13 +13,25 @@ export const TeacherReportsTab: React.FC<TeacherReportsTabProps> = ({ students }
   const [isPublishing, setIsPublishing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('');
+  const assignedClasses = Array.from(new Map(
+    students.filter(student => student.classId).map(student => [student.classId!, student.grade]),
+  ).entries());
+
+  React.useEffect(() => {
+    if (!selectedClassId && assignedClasses.length) setSelectedClassId(assignedClasses[0][0]);
+  }, [assignedClasses.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const visibleStudents = selectedClassId
+    ? students.filter(student => student.classId === selectedClassId)
+    : [];
 
   const publish = async () => {
     setError('');
     setSuccess('');
     setIsPublishing(true);
     try {
-      const result = await publishMidtermReports({ period, comments });
+      const result = await publishMidtermReports({ period, classId: selectedClassId, comments });
       setSuccess(result.message);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Reports could not be published.');
@@ -35,21 +47,29 @@ export const TeacherReportsTab: React.FC<TeacherReportsTabProps> = ({ students }
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">Midterm pupil reports</h2>
           <p className="mt-1 text-xs text-slate-500">Review each pupil’s midterm marks and attendance, add a class-teacher comment, and publish to linked parents.</p>
         </div>
-        <label className="text-xs font-bold text-slate-600 dark:text-slate-300">
-          Report period
-          <input value={period} maxLength={50} onChange={event => setPeriod(event.target.value)} className="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-        </label>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-xs font-bold text-slate-600 dark:text-slate-300">
+            Assigned class
+            <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+              {assignedClasses.map(([classId, className]) => <option key={classId} value={classId}>{className}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-bold text-slate-600 dark:text-slate-300">
+            Report period
+            <input value={period} maxLength={50} onChange={event => setPeriod(event.target.value)} className="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+          </label>
+        </div>
       </header>
 
       {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{error}</p>}
       {success && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">{success}</p>}
 
-      {!students.length ? (
+      {!assignedClasses.length ? (
         <p className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">No active pupils are currently assigned to your class. Ask an administrator to assign your class first.</p>
       ) : (
         <>
           <div className="grid gap-4 lg:grid-cols-2">
-            {students.map(student => (
+            {visibleStudents.map(student => (
               <article key={student.id} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -79,7 +99,7 @@ export const TeacherReportsTab: React.FC<TeacherReportsTabProps> = ({ students }
           <div className="flex justify-end">
             <button
               type="button"
-              disabled={isPublishing || !period.trim() || students.some(student => !comments[student.id]?.trim())}
+              disabled={isPublishing || !period.trim() || !selectedClassId || visibleStudents.some(student => !comments[student.id]?.trim())}
               onClick={() => void publish()}
               className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >

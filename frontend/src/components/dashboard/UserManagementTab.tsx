@@ -229,6 +229,13 @@ export const UserManagementTab: React.FC = () => {
       setToastMsg({ type: 'error', text: 'Select a class and subject for every subject-teacher assignment' });
       return;
     }
+    if (formRole === 'teacher' && formTeacherType === 'subject_teacher') {
+      const assignmentKeys = formSubjectAssignments.map(item => `${item.classId}:${item.subjectId}`);
+      if (new Set(assignmentKeys).size !== assignmentKeys.length) {
+        setToastMsg({ type: 'error', text: 'Each class and subject pair can only be assigned once' });
+        return;
+      }
+    }
 
     setIsCreating(true);
     try {
@@ -795,7 +802,9 @@ export const UserManagementTab: React.FC = () => {
                     <p className="text-amber-700 dark:text-amber-300">Add a class before creating a teacher account.</p>
                   ) : (
                     <>
+                      <label className="text-[10px] font-bold uppercase text-slate-500">Teacher type *</label>
                       <select
+                        required
                         value={formTeacherType}
                         onChange={event => setFormTeacherType(event.target.value as 'class_teacher' | 'subject_teacher')}
                         className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
@@ -838,6 +847,7 @@ export const UserManagementTab: React.FC = () => {
                           ) : formSubjectAssignments.map((assignment, index) => (
                             <div key={index} className="grid grid-cols-[1fr_1fr_auto] gap-2">
                               <select
+                                required
                                 aria-label={`Class assignment ${index + 1}`}
                                 value={assignment.classId}
                                 onChange={event => setFormSubjectAssignments(current => current.map((item, itemIndex) =>
@@ -849,6 +859,7 @@ export const UserManagementTab: React.FC = () => {
                                 {teacherOptions.classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                               </select>
                               <select
+                                required
                                 aria-label={`Subject assignment ${index + 1}`}
                                 value={assignment.subjectId}
                                 onChange={event => setFormSubjectAssignments(current => current.map((item, itemIndex) =>
@@ -1016,8 +1027,10 @@ export const UserManagementTab: React.FC = () => {
                   </button>
                 </div>
                 <input
-                  type="text"
+                  type="password"
                   required
+                  autoComplete="new-password"
+                  minLength={8}
                   value={formPassword}
                   onChange={e => setFormPassword(e.target.value)}
                   placeholder="Set account password"

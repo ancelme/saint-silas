@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { Role, SchoolEvent } from '../../types';
 import { Calendar, Clock, MapPin, Tag, Plus, Pencil, Trash2, X, Save } from 'lucide-react';
+import { fetchSystemSettings } from '../../services/api';
 
 interface CalendarTabProps {
   events: SchoolEvent[];
@@ -26,6 +27,11 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ events, currentUserRol
   const [form, setForm] = useState<Omit<SchoolEvent, 'id'>>(emptyEvent);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [academicSettings, setAcademicSettings] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetchSystemSettings().then(setAcademicSettings).catch(() => undefined);
+  }, []);
 
   const openEditor = (event?: SchoolEvent) => {
     setEditingEvent(event || null);
@@ -77,9 +83,9 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ events, currentUserRol
   };
 
   const terms = [
-    { name: 'Term 1', dates: 'Sept 08, 2025 – Dec 19, 2025', status: 'Completed' },
-    { name: 'Term 2 (Current)', dates: 'Jan 05, 2026 – Apr 03, 2026', status: 'In Progress' },
-    { name: 'Term 3', dates: 'Apr 20, 2026 – Jul 10, 2026', status: 'Upcoming' },
+    { name: 'Term 1', dates: academicSettings.term_1_dates || 'Sept 08 – Dec 19', status: 'Completed' },
+    { name: 'Term 2 (Current)', dates: academicSettings.term_2_dates || 'Jan 05 – Apr 03', status: 'In Progress' },
+    { name: 'Term 3', dates: academicSettings.term_3_dates || 'Apr 20 – Jul 10', status: 'Upcoming' },
   ];
 
   const nationalHolidays = [

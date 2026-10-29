@@ -109,7 +109,7 @@ import {
   saveSchoolEvents,
   saveTimetable,
 } from '../controllers/schoolContentController';
-import { authenticateToken, requireRole, requireOwnerOnly } from '../middleware/auth';
+import { authenticateToken, requireRole, requireOwnerOnly, requireAccountCreator } from '../middleware/auth';
 
 const router = Router();
 
@@ -143,13 +143,13 @@ router.delete('/messages/:id', authenticateToken, deleteDirectMessage);
 // ==========================================
 // 2. User & Staff Management (Administrator & Super Admin / Owner)
 // ==========================================
-router.get('/users', authenticateToken, requireRole('admin'), getUsers);
-router.post('/users/staff', authenticateToken, requireRole('admin'), createStaffUser);
-router.put('/users/:id', authenticateToken, requireRole('admin'), updateUser);
-router.put('/users/:id/status', authenticateToken, requireRole('admin'), updateUserStatus);
-router.put('/users/:id/role', authenticateToken, requireRole('admin'), updateUserRole);
-router.post('/users/:id/reset-password', authenticateToken, requireRole('admin'), resetUserPassword);
-router.delete('/users/:id', authenticateToken, requireRole('admin'), deleteUser);
+router.get('/users', authenticateToken, requireAccountCreator, getUsers);
+router.post('/users/staff', authenticateToken, requireAccountCreator, createStaffUser);
+router.put('/users/:id', authenticateToken, requireAccountCreator, updateUser);
+router.put('/users/:id/status', authenticateToken, requireAccountCreator, updateUserStatus);
+router.put('/users/:id/role', authenticateToken, requireAccountCreator, updateUserRole);
+router.post('/users/:id/reset-password', authenticateToken, requireAccountCreator, resetUserPassword);
+router.delete('/users/:id', authenticateToken, requireAccountCreator, deleteUser);
 
 // ==========================================
 // 3. Students & Faculty (Full CRUD: Add, View, Update, Delete)
@@ -219,9 +219,9 @@ router.post('/reports/midterm/publish', authenticateToken, requireRole('teacher'
 // 8. Official Announcements (Full CRUD)
 // ==========================================
 router.get('/announcements', getAnnouncements);
-router.post('/announcements', authenticateToken, requireRole('admin', 'head_teacher'), createAnnouncement);
-router.put('/announcements/:id', authenticateToken, requireRole('admin', 'head_teacher'), updateAnnouncement);
-router.delete('/announcements/:id', authenticateToken, requireRole('admin', 'head_teacher'), deleteAnnouncement);
+router.post('/announcements', authenticateToken, requireRole('owner', 'super_admin', 'admin', 'head_teacher'), createAnnouncement);
+router.put('/announcements/:id', authenticateToken, requireRole('owner', 'super_admin', 'admin', 'head_teacher'), updateAnnouncement);
+router.delete('/announcements/:id', authenticateToken, requireRole('owner', 'super_admin', 'admin', 'head_teacher'), deleteAnnouncement);
 
 // ==========================================
 // 9. Security Audit Logs (Super Admin / Owner ONLY)
@@ -238,7 +238,7 @@ router.post('/ai/role-assistant', authenticateToken, askRoleAssistant);
 // 11. Institutional Settings & Database Backup (Owner ONLY)
 // ==========================================
 router.get('/system/settings', getSchoolSettings);
-router.put('/system/settings', authenticateToken, requireOwnerOnly, updateSchoolSetting);
+router.put('/system/settings', authenticateToken, requireAccountCreator, updateSchoolSetting);
 router.get('/system/backup', authenticateToken, requireOwnerOnly, exportDatabaseDump);
 router.get('/system/health', getSystemHealth);
 

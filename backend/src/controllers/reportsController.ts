@@ -61,11 +61,15 @@ export async function publishMidtermReports(req: AuthRequest, res: Response) {
 
   const period = typeof req.body?.period === 'string' ? req.body.period.trim() : '';
   const comments = req.body?.comments;
+  const classId = typeof req.body?.classId === 'string' ? req.body.classId.trim() : '';
   if (!period || period.length > 50) {
     return res.status(400).json({ error: 'Enter a report period of 1 to 50 characters.' });
   }
   if (!comments || typeof comments !== 'object' || Array.isArray(comments)) {
     return res.status(400).json({ error: 'Teacher comments must be provided for the report.' });
+  }
+  if (!classId) {
+    return res.status(400).json({ error: 'Select the class whose reports you want to publish.' });
   }
 
   try {
@@ -80,9 +84,9 @@ export async function publishMidtermReports(req: AuthRequest, res: Response) {
       `SELECT s.id, s.first_name, s.last_name, s.grade, s.class_id, s.parent_id, c.name AS class_name
        FROM students s
        JOIN classes c ON c.id = s.class_id
-       WHERE c.class_teacher_id = ? AND s.status <> 'Archived'
+       WHERE c.class_teacher_id = ? AND c.id = ? AND s.status <> 'Archived'
        ORDER BY s.last_name, s.first_name`,
-      [teacher.id],
+      [teacher.id, classId],
     );
     if (!studentsResult.rows.length) {
       return res.status(400).json({ error: 'There are no active pupils in your assigned class.' });

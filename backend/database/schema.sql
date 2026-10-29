@@ -1,6 +1,6 @@
 -- ===================================================================
 -- ST. SILAS PRIVATE PRIMARY SCHOOL (EAR KIBONDO)
--- PRODUCTION DATABASE SCHEMA (POSTGRESQL COMPATIBLE)
+-- SUPABASE DATABASE SCHEMA (POSTGRESQL)
 -- REB Center Code: 530413 | Gatsibo District, Eastern Province, Rwanda
 -- ===================================================================
 

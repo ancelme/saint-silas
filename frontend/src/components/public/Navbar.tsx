@@ -136,7 +136,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onNavigateToDashboar
                 className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 tracking-wide block hover:underline text-left cursor-pointer"
                 title={t('clickToOpenMap')}
               >
-                📍 {t('schoolLocationShort')}
+                📍📕 {t('schoolLocationShort')}
               </button>
             </div>
           </a>

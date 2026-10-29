@@ -3,6 +3,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { AdmissionApplication } from '../../types';
 import confetti from 'canvas-confetti';
+import { fetchSystemSettings } from '../../services/api';
 import {
   FileText,
   UserCheck,
@@ -39,6 +40,14 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
   const [pupilPhotoName, setPupilPhotoName] = useState('');
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [schoolSettings, setSchoolSettings] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetchSystemSettings().then(setSchoolSettings).catch(() => undefined);
+  }, []);
+
+  const formatFee = (value: string, fallback: string) =>
+    `${Number(value || fallback).toLocaleString('en-US')} RWF`;
 
   const [form, setForm] = useState({
     studentName: '',
@@ -242,7 +251,7 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
               </div>
               <div>
                 <span className="text-2xl font-extrabold text-slate-900 dark:text-white">
-                  45,000 RWF
+                  {formatFee(schoolSettings.tuition_nursery, '45000')}
                 </span>
                 <span className="text-xs text-slate-400 block">{t('tuitionScheduleSub')}</span>
               </div>
@@ -274,7 +283,7 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
               </div>
               <div>
                 <span className="text-2xl font-extrabold text-slate-900 dark:text-white">
-                  55,000 RWF
+                  {formatFee(schoolSettings.tuition_lower_primary, '55000')}
                 </span>
                 <span className="text-xs text-slate-400 block">{t('tuitionScheduleSub')}</span>
               </div>
@@ -303,7 +312,7 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
               </div>
               <div>
                 <span className="text-2xl font-extrabold text-slate-900 dark:text-white">
-                  65,000 RWF
+                  {formatFee(schoolSettings.tuition_upper_primary, '65000')}
                 </span>
                 <span className="text-xs text-slate-400 block">{t('tuitionScheduleSub')}</span>
               </div>

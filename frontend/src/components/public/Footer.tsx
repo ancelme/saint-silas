@@ -72,7 +72,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth }) => {
               </p>
               <p className="flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>+250 788 765 432</span>
+                <span>+250781811662</span>
               </p>
               <p className="flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-emerald-400 shrink-0" />

@@ -3,6 +3,33 @@ import { createHash } from 'crypto';
 import { db } from '../db/index';
 import { AuthRequest, recordAuditLog } from '../middleware/auth';
 
+async function notifyAttendanceRecipients(studentId: string, date: string, status: string, senderId: string) {
+  const recipients = await db.query(
+    `SELECT DISTINCT recipient_id FROM (
+       SELECT ct.user_id AS recipient_id FROM students s
+       JOIN classes c ON c.id = s.class_id JOIN teachers ct ON ct.id = c.class_teacher_id
+       WHERE s.id = ? AND ct.user_id IS NOT NULL
+       UNION
+       SELECT p.user_id AS recipient_id FROM students s JOIN parents p ON p.id = s.parent_id WHERE s.id = ? AND p.user_id IS NOT NULL
+       UNION
+       SELECT p.user_id AS recipient_id FROM parent_students ps JOIN parents p ON p.id = ps.parent_id WHERE ps.student_id = ? AND p.user_id IS NOT NULL
+     )`,
+    [studentId, studentId, studentId],
+  );
+  for (const row of recipients.rows) {
+    const recipientId = row.recipient_id;
+    if (!recipientId) continue;
+    const details = `Attendance for ${date} was changed to ${status}.`;
+    const id = `msg-${createHash('sha256').update(`${studentId}:attendance:${recipientId}:${details}`).digest('hex').slice(0, 32)}`;
+    await db.query(
+      `INSERT INTO messages (id, sender_id, recipient_id, subject, body, is_read)
+       VALUES (?, ?, ?, ?, ?, 0)
+       ON CONFLICT (id) DO UPDATE SET body = EXCLUDED.body, is_read = 0, created_at = CURRENT_TIMESTAMP`,
+      [id, senderId, recipientId, 'Attendance update', details],
+    );
+  }
+}
+
 export async function getAttendance(req: AuthRequest, res: Response) {
   try {
     const { date, classId, subjectId } = req.query;
@@ -160,6 +187,7 @@ export async function saveAttendance(req: AuthRequest, res: Response) {
         [recordId, studentId, classId, subjectId || null, date, status, remarks || '', req.user?.id || 'sys']
       );
       savedRecords.push({ id: recordId, studentId, date, subjectId: subjectId || undefined });
+      await notifyAttendanceRecipients(studentId, date, status, req.user?.id || 'sys');
 
       // Recalculate attendance rate for student
       if (!subjectId) {
