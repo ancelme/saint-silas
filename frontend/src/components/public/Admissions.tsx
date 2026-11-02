@@ -38,6 +38,8 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
   const [submittedTicket, setSubmittedTicket] = useState('');
   const [pupilPhoto, setPupilPhoto] = useState('');
   const [pupilPhotoName, setPupilPhotoName] = useState('');
+  const [applicationLetter, setApplicationLetter] = useState('');
+  const [applicationLetterName, setApplicationLetterName] = useState('');
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [schoolSettings, setSchoolSettings] = useState<Record<string, string>>({});
@@ -79,8 +81,8 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
       return;
     }
 
-    if (!form.studentName || !form.phone || !pupilPhoto) {
-      setFormError('Complete the required details and choose a pupil photo.');
+    if (!form.studentName || !form.phone || !pupilPhoto || !applicationLetter) {
+      setFormError('Complete the required details, pupil photo, and application letter.');
       return;
     }
 
@@ -96,6 +98,7 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
       id: `adm-${Date.now()}`,
       applicantName: form.studentName,
       photoUrl: pupilPhoto,
+      applicationLetterUrl: applicationLetter,
       gender: form.gender,
       dob: '2020-05-14',
       applyingGrade: form.grade,
@@ -166,6 +169,8 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
     setInquirySubmitted(false);
     setPupilPhoto('');
     setPupilPhotoName('');
+    setApplicationLetter('');
+    setApplicationLetterName('');
     setFormError('');
     setForm({
       studentName: '',
@@ -177,6 +182,31 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
       village: 'Kibondo Village, Simbwa Cell',
       previousSchool: 'Kibondo Early Childhood Development (ECD)',
     });
+  };
+
+  const handleApplicationLetterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf' && !['image/jpeg', 'image/png'].includes(file.type)) {
+      setFormError('Upload the application letter as PDF, JPEG, or PNG.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setFormError('The application letter must be 4 MB or smaller.');
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setApplicationLetter(reader.result);
+        setApplicationLetterName(file.name);
+        setFormError('');
+      }
+    };
+    reader.onerror = () => setFormError('The application letter could not be read.');
+    reader.readAsDataURL(file);
   };
 
   const steps = [
@@ -506,6 +536,26 @@ export const Admissions: React.FC<AdmissionsProps> = ({ onOpenAuth, onNewAdmissi
                     <p className="text-[10px] text-slate-500 mt-1">{pupilPhotoName || 'JPEG, PNG, or WebP; maximum 4 MB'}</p>
                   </div>
                 </div>
+              </div>
+
+              <div>
+                <label htmlFor="public-admission-letter" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Application Letter *
+                </label>
+                <label htmlFor="public-admission-letter" className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/50 px-4 py-3 cursor-pointer dark:border-emerald-800 dark:bg-emerald-950/20">
+                  <span className="flex items-center gap-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                    <Upload className="w-4 h-4" />
+                    {applicationLetterName || 'Choose application letter'}
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-500">PDF, JPG, PNG · 4 MB</span>
+                </label>
+                <input
+                  id="public-admission-letter"
+                  type="file"
+                  accept="application/pdf,image/jpeg,image/png"
+                  onChange={handleApplicationLetterChange}
+                  className="sr-only"
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

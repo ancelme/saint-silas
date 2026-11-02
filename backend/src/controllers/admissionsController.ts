@@ -33,6 +33,7 @@ export async function getAdmissions(req: AuthRequest, res: Response) {
       parentPhone: row.parent_phone,
       parentEmail: row.parent_email || '',
       photoUrl: row.photo_url || undefined,
+      applicationLetterUrl: row.application_letter_url || undefined,
       district: row.district || 'Gatsibo',
       sector: row.sector || 'Kabarore',
       cell: row.cell || 'Simbwa',
@@ -70,6 +71,7 @@ export async function submitAdmission(req: AuthRequest, res: Response) {
       parentPhone,
       parentEmail,
       photoUrl,
+      applicationLetterUrl,
       district,
       sector,
       cell,
@@ -83,6 +85,9 @@ export async function submitAdmission(req: AuthRequest, res: Response) {
     if (!isValidProfileImage(photoUrl, 4 * 1024 * 1024)) {
       return res.status(400).json({ error: 'A JPEG, PNG, or WebP pupil photo of 4 MB or smaller is required' });
     }
+    if (!applicationLetterUrl || !/^data:(application\/pdf|image\/jpeg|image\/png);base64,/i.test(applicationLetterUrl)) {
+      return res.status(400).json({ error: 'A PDF, JPEG, or PNG application letter of 4 MB or smaller is required' });
+    }
 
     const admissionId = `adm-${Date.now()}`;
     const calculatedLevel = level || (applyingGrade.includes('Nursery') ? 'Nursery' : ['Primary 1', 'Primary 2', 'Primary 3'].includes(applyingGrade) ? 'Lower Primary' : 'Upper Primary');
@@ -91,9 +96,9 @@ export async function submitAdmission(req: AuthRequest, res: Response) {
     await db.query(
       `INSERT INTO admissions (
         id, user_id, applicant_name, gender, dob, applying_grade, level,
-        parent_name, parent_phone, parent_email, photo_url, district, sector, cell, village,
+        parent_name, parent_phone, parent_email, photo_url, application_letter_url, district, sector, cell, village,
         previous_school, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', CURRENT_TIMESTAMP)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', CURRENT_TIMESTAMP)`,
       [
         admissionId,
         req.user.id,
@@ -106,6 +111,7 @@ export async function submitAdmission(req: AuthRequest, res: Response) {
         parentPhone.trim(),
         targetEmail,
         photoUrl,
+        applicationLetterUrl,
         district || 'Gatsibo',
         sector || 'Kabarore',
         cell || 'Simbwa',
@@ -200,8 +206,9 @@ export async function answerAdmission(req: AuthRequest, res: Response) {
       [decision, streamToAssign, answerText || '', today, responder, id]
     );
 
-    // If decision is Approved, automatically enroll the pupil into students table if not already enrolled!
-    if (decision === 'Approved') {
+    // Admissions approval only updates the application and sends email feedback.
+    // Admins can enroll the pupil later through the explicit student management flow.
+    if (false && decision === 'Approved') {
       const existingStudent = await db.query(
         `SELECT id FROM students WHERE LOWER(first_name) = LOWER(?) AND LOWER(last_name) = LOWER(?)`,
         [adm.applicant_name.split(' ')[0], adm.applicant_name.split(' ').slice(1).join(' ')]

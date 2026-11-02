@@ -285,6 +285,7 @@ class DatabaseManager {
         fee_status VARCHAR(30) DEFAULT 'Pending',
         address TEXT,
         photo_url TEXT,
+        application_letter_url TEXT,
         attendance_rate REAL DEFAULT 100.0,
         overall_gpa REAL DEFAULT 0.0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -583,6 +584,9 @@ class DatabaseManager {
     );
     if (!admissionColumns.rows.some(({ name }) => name === 'photo_url')) {
       await this.query(`ALTER TABLE admissions ADD COLUMN photo_url TEXT`);
+    }
+    if (!admissionColumns.rows.some(({ name }) => name === 'application_letter_url')) {
+      await this.query(`ALTER TABLE admissions ADD COLUMN application_letter_url TEXT`);
     }
 
     const messageColumns = await this.query<{ name: string; data_type?: string }>(

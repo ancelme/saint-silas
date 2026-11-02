@@ -260,6 +260,7 @@ export interface AdmissionApplication {
   parentPhone: string;
   parentEmail: string;
   photoUrl?: string;
+  applicationLetterUrl?: string;
   district: string;
   sector: string;
   cell: string;

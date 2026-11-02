@@ -177,7 +177,7 @@ router.delete('/teachers/:id', authenticateToken, requireRole('admin'), deleteTe
 // ==========================================
 // 4. Admissions (Online Application & Email Feedback)
 // ==========================================
-router.get('/admissions', authenticateToken, requireRole('admin', 'head_teacher', 'parent'), getAdmissions);
+router.get('/admissions', authenticateToken, requireRole('admin', 'head_teacher', 'parent', 'applicant'), getAdmissions);
 router.post('/admissions', authenticateToken, submitAdmission);
 router.put('/admissions/:id', authenticateToken, requireRole('admin', 'head_teacher'), updateAdmission);
 router.post('/admissions/:id/answer', authenticateToken, requireRole('admin', 'head_teacher'), answerAdmission);

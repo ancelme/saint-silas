@@ -400,6 +400,8 @@ CREATE TABLE IF NOT EXISTS admissions (
   parent_name VARCHAR(150) NOT NULL,
   parent_phone VARCHAR(50) NOT NULL,
   parent_email VARCHAR(191),
+  photo_url TEXT,
+  application_letter_url TEXT,
   district VARCHAR(100) DEFAULT 'Gatsibo',
   sector VARCHAR(100) DEFAULT 'Kabarore',
   cell VARCHAR(100) DEFAULT 'Simbwa',
