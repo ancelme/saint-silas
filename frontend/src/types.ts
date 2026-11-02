@@ -9,7 +9,8 @@ export type Role =
   | 'accountant'
   | 'librarian'
   | 'parent'
-  | 'student';
+  | 'student'
+  | 'applicant';
 
 export type SchoolLevel = 'Nursery' | 'Lower Primary' | 'Upper Primary';
 

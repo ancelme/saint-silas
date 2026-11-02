@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 
 interface NavbarProps {
-  onOpenAuth: (initialTab?: 'login') => void;
+  onOpenAuth: (initialTab?: 'login' | 'signup') => void;
   onNavigateToDashboard: () => void;
   onOpenMap?: () => void;
 }
@@ -30,7 +30,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onNavigateToDashboard, onOpenMap }) => {
   const { language, setLanguage, t } = useLanguage();
   const { theme, toggleTheme, setTheme } = useTheme();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const { settings } = useSchoolSettings();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
@@ -286,7 +286,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onNavigateToDashboar
             </button>
 
             {/* Auth Actions */}
-            {isAuthenticated ? (
+            {isAuthenticated && user?.role !== 'applicant' ? (
               <button
                 type="button"
                 onClick={onNavigateToDashboard}
@@ -304,6 +304,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onNavigateToDashboar
                   className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-emerald-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
                 >
                   {t('navLogin')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenAuth('signup')}
+                  className="px-3.5 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 rounded-xl transition-colors"
+                >
+                  Sign Up
                 </button>
                 <a
                   href="#admissions"
@@ -431,7 +438,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onNavigateToDashboar
 
           {/* Mobile Auth Actions */}
           <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2">
-            {isAuthenticated ? (
+            {isAuthenticated && user?.role !== 'applicant' ? (
               <button
                 type="button"
                 onClick={() => {
@@ -453,6 +460,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onNavigateToDashboar
                   className="w-full py-2.5 rounded-xl text-center text-xs font-bold border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200"
                 >
                   {t('navLogin')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    onOpenAuth('signup');
+                  }}
+                  className="w-full py-2.5 rounded-xl text-center text-xs font-bold bg-slate-800 text-white"
+                >
+                  Sign Up
                 </button>
                 <a
                   href="#admissions"

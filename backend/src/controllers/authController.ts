@@ -14,6 +14,81 @@ import { isValidProfileImage } from '../utils/profileImage';
 
 const PRIVILEGED_ROLES = ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'accountant', 'librarian'];
 
+export async function registerApplicant(req: Request, res: Response) {
+  try {
+    const { fullName, email, username, password } = req.body;
+    const cleanFullName = typeof fullName === 'string' ? fullName.trim() : '';
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const cleanUsername = typeof username === 'string' ? username.trim().toLowerCase() : '';
+
+    if (!cleanFullName || !cleanEmail || !cleanUsername || !password) {
+      return res.status(400).json({ error: 'Name, username, email, and password are required.' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return res.status(400).json({ error: 'Enter a valid email address.' });
+    }
+    if (!/^[a-z0-9._-]{3,50}$/i.test(cleanUsername)) {
+      return res.status(400).json({ error: 'Username must contain 3-50 letters, numbers, dots, underscores, or hyphens.' });
+    }
+    if (typeof password !== 'string' || password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    }
+
+    const existing = await db.query(
+      `SELECT id FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1`,
+      [cleanEmail, cleanUsername]
+    );
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'An account already exists with that username or email.' });
+    }
+
+    const userId = `usr-applicant-${Date.now()}`;
+    const passwordHash = await bcrypt.hash(password, 10);
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    await db.query(
+      `INSERT INTO users (id, username, email, password_hash, full_name, role, status, must_change_password, is_active, email_verified, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'applicant', 'Active', 0, 1, 0, ?, ?)`,
+      [userId, cleanUsername, cleanEmail, passwordHash, cleanFullName, now, now]
+    );
+
+    await recordAuditLog({
+      userId,
+      userName: cleanFullName,
+      userEmail: cleanEmail,
+      role: 'applicant',
+      action: 'APPLICANT_ACCOUNT_CREATED',
+      details: `Public applicant account registered for ${cleanFullName} (${cleanUsername}).`,
+      ipAddress: req.ip
+    });
+
+    const token = generateToken({
+      id: userId,
+      username: cleanUsername,
+      email: cleanEmail,
+      role: 'applicant',
+      fullName: cleanFullName,
+      mustChangePassword: false
+    });
+    setSessionCookie(res, token);
+
+    return res.status(201).json({
+      user: {
+        id: userId,
+        username: cleanUsername,
+        email: cleanEmail,
+        fullName: cleanFullName,
+        role: 'applicant',
+        status: 'Active',
+        mustChangePassword: false,
+        isAuthenticatedApplicant: true
+      }
+    });
+  } catch (error: any) {
+    console.error('Applicant registration error:', error);
+    return res.status(500).json({ error: error.message || 'Failed to create applicant account' });
+  }
+}
+
 export async function getSetupStatus(req: Request, res: Response) {
   try {
     const isConfigured = await db.checkIsOwnerConfigured();

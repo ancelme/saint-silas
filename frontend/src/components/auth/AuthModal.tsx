@@ -23,7 +23,7 @@ import {
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'login' | 'setup';
+  initialTab?: 'login' | 'signup' | 'setup';
   onSuccess: () => void;
 }
 
@@ -34,9 +34,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onSuccess,
 }) => {
   const { t } = useLanguage();
-  const { login, setupOwner, isOwnerConfigured, defaultOwnerUsername } = useAuth();
+  const { login, setupOwner, registerPublicApplicant, isOwnerConfigured, defaultOwnerUsername } = useAuth();
 
-  const [tab, setTab] = useState<'login' | 'setup'>(initialTab);
+  const [tab, setTab] = useState<'login' | 'signup' | 'setup'>(initialTab);
 
   // Form Fields
   const [identifier, setIdentifier] = useState('');
@@ -96,6 +96,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }, 500);
     } else {
       setErrorMsg(res.error || 'Authentication failed. Please verify credentials.');
+    }
+  };
+
+  const handleApplicantSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+    if (password.length < 8) {
+      setErrorMsg('Applicant password must be at least 8 characters.');
+      return;
+    }
+    setIsSubmitting(true);
+    const result = await registerPublicApplicant({ fullName, email, username, password });
+    setIsSubmitting(false);
+    if (result.success) {
+      setSuccessMsg('Applicant account created. You can now submit an application.');
+      setTimeout(() => { onSuccess(); onClose(); }, 500);
+    } else {
+      setErrorMsg(result.error || 'Unable to create applicant account.');
     }
   };
 
@@ -219,6 +238,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               >
                 Sign In
               </button>
+              <button
+                type="button"
+                onClick={() => { setTab('signup'); setErrorMsg(''); }}
+                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
+                  tab === 'signup' ? 'bg-white text-slate-900 shadow-sm' : 'text-white/80 hover:text-white'
+                }`}
+              >
+                Sign Up
+              </button>
               {!isOwnerConfigured && (
                 <button
                   type="button"
@@ -326,6 +354,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     </button>
                   </div>
                 )}
+              </form>
+            )}
+
+            {tab === 'signup' && (
+              <form onSubmit={handleApplicantSignup} className="space-y-3.5">
+                <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-200 text-xs">
+                  Create a public applicant account to apply and receive admissions responses by email. This account does not provide access to the school dashboard.
+                </div>
+                <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Full name" className="w-full px-3.5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs" required />
+                <input value={username} onChange={e => setUsername(e.target.value)} placeholder="Username" className="w-full px-3.5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs" required />
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email address" className="w-full px-3.5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs" required />
+                <div className="relative">
+                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Password (8+ characters)" className="w-full px-3.5 py-3 pr-10 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs" required />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-3 text-slate-400">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
+                </div>
+                <button type="submit" disabled={isSubmitting} className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs disabled:opacity-50">
+                  {isSubmitting ? 'Creating account...' : 'Create Applicant Account'}
+                </button>
               </form>
             )}
 

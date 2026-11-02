@@ -9,6 +9,7 @@ import {
   logoutUser,
   getSetupStatus,
   setupInitialOwner,
+  registerApplicant,
   clearAuthToken
 } from '../services/api';
 import { connectChatSocket, disconnectChatSocket } from '../services/chatSocket';
@@ -30,6 +31,7 @@ interface AuthContextType {
     recoveryPhone: string;
   }) => Promise<{ success: boolean; error?: string }>;
   setupOwner: (payload: { fullName: string; email: string; username: string; password: string; phone?: string; avatar: string }) => Promise<{ success: boolean; error?: string }>;
+  registerPublicApplicant: (payload: { fullName: string; email: string; username: string; password: string }) => Promise<{ success: boolean; error?: string }>;
   updateUserAvatar: (avatarUrl: string) => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
   changeAccountPassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
@@ -156,6 +158,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const registerPublicApplicant = async (payload: { fullName: string; email: string; username: string; password: string }) => {
+    try {
+      const res = await registerApplicant(payload);
+      if (res?.user) {
+        setUser({ ...res.user, name: res.user.fullName || res.user.username });
+        return { success: true };
+      }
+      return { success: false, error: 'Account creation failed' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Account creation failed' };
+    }
+  };
+
   const updateUserAvatar = async (avatarUrl: string) => {
     try {
       await updateProfile({ avatarUrl });
@@ -209,6 +224,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         completeFirstTimePasswordSetup,
         setupOwner,
+        registerPublicApplicant,
         updateUserAvatar,
         updateUser,
         changeAccountPassword,

@@ -177,6 +177,19 @@ export async function loginUser(payload: { identifier: string; password: string 
   return data;
 }
 
+export async function registerApplicant(payload: {
+  fullName: string;
+  username: string;
+  email: string;
+  password: string;
+}) {
+  const data = await request<{ user: User }>('/api/auth/applicant/register', {
+    method: 'POST', body: JSON.stringify(payload),
+  });
+  clearAuthToken();
+  return data;
+}
+
 export async function completeFirstLogin(payload: {
   currentPassword: string;
   newPassword: string;

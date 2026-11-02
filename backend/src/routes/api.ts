@@ -3,6 +3,7 @@ import {
   getSetupStatus,
   setupInitialOwner,
   login,
+  registerApplicant,
   completeFirstLogin,
   getCurrentUser,
   updateProfile,
@@ -125,6 +126,7 @@ router.get('/setup/status', getSetupStatus);
 router.post('/setup/owner', setupInitialOwner);
 
 router.post('/auth/login', login);
+router.post('/auth/applicant/register', registerApplicant);
 router.post('/auth/complete-first-login', authenticateToken, completeFirstLogin);
 router.get('/auth/me', authenticateToken, getCurrentUser);
 router.put('/auth/profile', authenticateToken, updateProfile);

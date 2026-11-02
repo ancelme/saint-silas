@@ -74,7 +74,7 @@ const MainApp: React.FC = () => {
 
   // Auth Modal State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authModalTab, setAuthModalTab] = useState<'login' | 'setup'>('login');
+  const [authModalTab, setAuthModalTab] = useState<'login' | 'signup' | 'setup'>('login');
 
   // Interactive Google Map Modal State
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
@@ -166,7 +166,7 @@ const MainApp: React.FC = () => {
 
   // If user logs in, switch to dashboard automatically
   useEffect(() => {
-    if (user) {
+    if (user && user.role !== 'applicant') {
       setViewMode('dashboard');
     } else {
       setViewMode('public');
@@ -174,7 +174,7 @@ const MainApp: React.FC = () => {
   }, [user]);
 
   // Handlers
-  const handleOpenAuth = (tab: 'login' | 'setup' = 'login') => {
+  const handleOpenAuth = (tab: 'login' | 'signup' | 'setup' = 'login') => {
     setAuthModalTab(tab);
     setIsAuthModalOpen(true);
   };

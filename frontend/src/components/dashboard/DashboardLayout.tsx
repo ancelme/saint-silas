@@ -313,6 +313,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   }, [activeTab, currentRole]);
 
   const roleBadges: Record<Role, { label: string; color: string }> = {
+    applicant: { label: 'Applicant', color: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300' },
     owner: { label: 'School Owner / Super Admin', color: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' },
     super_admin: { label: 'Super Administrator', color: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' },
     admin: { label: t('roleAdmin') || 'Administrator', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' },
