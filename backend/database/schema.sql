@@ -306,6 +306,34 @@ CREATE TABLE IF NOT EXISTS expenses (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 20b. Stock Inventory
+CREATE TABLE IF NOT EXISTS stock_items (
+  id VARCHAR(36) PRIMARY KEY,
+  name VARCHAR(150) NOT NULL,
+  category VARCHAR(100) NOT NULL,
+  unit VARCHAR(30) NOT NULL,
+  quantity REAL DEFAULT 0,
+  reorder_level REAL DEFAULT 0,
+  unit_cost REAL DEFAULT 0,
+  location VARCHAR(150) DEFAULT '',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS stock_movements (
+  id VARCHAR(36) PRIMARY KEY,
+  item_id VARCHAR(36) NOT NULL,
+  item_name VARCHAR(150) NOT NULL,
+  type VARCHAR(10) NOT NULL,
+  quantity REAL NOT NULL,
+  unit_cost REAL DEFAULT 0,
+  reference_no VARCHAR(100) DEFAULT '',
+  recipient VARCHAR(150) DEFAULT '',
+  notes TEXT,
+  recorded_by VARCHAR(150) DEFAULT '',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 21. Library Books (Managed by Librarian / Owner)
 CREATE TABLE IF NOT EXISTS library_books (
   id VARCHAR(36) PRIMARY KEY,
