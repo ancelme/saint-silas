@@ -706,51 +706,55 @@ export const UserManagementTab: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-4"
+            className="relative w-full max-w-5xl overflow-hidden rounded-[2rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl"
           >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center">
-                  <UserPlus className="w-4 h-4" />
+            <div className="flex items-center justify-between bg-gradient-to-r from-blue-950 via-blue-900 to-blue-950 px-5 py-4 text-white sm:px-7">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-amber-300 bg-white text-blue-950 shadow-lg">
+                  <GraduationCap className="h-7 w-7" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Add Authorized User & Role
+                  <h3 className="font-heading text-lg font-black leading-none tracking-tight sm:text-xl">
+                    SAINT-SILAS
                   </h3>
-                  <span className="text-[10px] text-slate-400">Administrator / Owner provisioning — instant login access</span>
+                  <span className="text-[10px] text-blue-100 sm:text-xs">School Management System</span>
                 </div>
+              </div>
+              <div className="hidden items-center gap-5 border-l border-white/30 pl-5 text-xs italic text-blue-100 sm:flex">
+                <span>Together for a Better Education</span>
+                <GraduationCap className="h-8 w-8" />
               </div>
               <button
                 type="button"
                 onClick={() => setIsCreateModalOpen(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600"
+                className="ml-2 rounded-full border border-white/20 p-2 text-white/80 hover:bg-white/10"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleCreateStaffSubmit} className="space-y-3.5 text-xs">
+            <form onSubmit={handleCreateStaffSubmit} className="max-h-[calc(100vh-7rem)] space-y-4 overflow-y-auto p-4 text-xs sm:p-6">
               {/* Photo Upload from Device */}
               <div>
                 <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">
                   Upload User Photo from Device
                 </label>
-                <div className="p-3 rounded-2xl border-2 border-dashed border-emerald-500/40 bg-emerald-50/20 dark:bg-emerald-950/20 flex items-center gap-3">
+                <div className="flex items-center gap-3 rounded-2xl border-2 border-dashed border-sky-400 bg-sky-50/40 p-3 dark:bg-slate-800/40">
                   {formAvatar ? (
                     <img
                       src={formAvatar}
                       alt="Preview"
-                      className="w-12 h-12 rounded-xl object-cover border-2 border-emerald-600 shrink-0"
+                      className="w-20 h-16 rounded-xl object-cover border-2 border-white shadow-md shrink-0"
                     />
                   ) : (
-                    <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center shrink-0">
-                      <Camera className="w-5 h-5" />
+                    <div className="w-20 h-16 rounded-xl bg-white dark:bg-slate-700 text-sky-500 flex items-center justify-center shrink-0 shadow-sm">
+                      <Camera className="w-7 h-7" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
                     <label
                       htmlFor="staff-avatar-upload"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer shadow-xs"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer shadow-md"
                     >
                       <Upload className="w-3.5 h-3.5" />
                       <span>{formAvatar ? 'Change Photo' : 'Select Photo from Device'}</span>
@@ -771,20 +775,25 @@ export const UserManagementTab: React.FC = () => {
 
               <div>
                 <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">Select System Role</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pr-1">
                   {ALL_ASSIGNABLE_ROLES.map(r => (
                     <button
                       key={r.role}
                       type="button"
                       onClick={() => setFormRole(r.role)}
-                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      className={`flex min-h-[72px] items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                         formRole === r.role
                           ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 shadow-xs'
                           : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'
                       }`}
                     >
-                      <span className="font-bold block text-xs">{r.label}</span>
-                      <span className="text-[10px] opacity-75 leading-tight block mt-0.5">{r.desc}</span>
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm dark:bg-slate-800">
+                        <r.icon className={`h-5 w-5 ${formRole === r.role ? 'text-emerald-600' : 'text-blue-600'}`} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="font-bold block text-xs">{r.label}</span>
+                        <span className="text-[10px] opacity-75 leading-tight block mt-0.5">{r.desc}</span>
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -965,19 +974,23 @@ export const UserManagementTab: React.FC = () => {
                 </fieldset>
               )}
 
-              <div>
-                <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">Full Legal Name</label>
-                <input
-                  type="text"
-                  required
-                  value={formFullName}
-                  onChange={e => setFormFullName(e.target.value)}
-                  placeholder="e.g. Mwalimu Jean Bosco Mugabo"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <section className="rounded-2xl border border-sky-200 bg-sky-50/30 p-4 dark:border-slate-700 dark:bg-slate-800/20">
+                <h4 className="mb-3 flex items-center gap-2 border-b border-slate-200 pb-2 text-sm font-bold text-slate-800 dark:text-white">
+                  <UserIcon className="h-4 w-4 text-blue-600" />
+                  Personal Information
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">Full Legal Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={formFullName}
+                      onChange={e => setFormFullName(e.target.value)}
+                      placeholder="e.g. Mwalimu Jean Bosco Mugabo"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                    />
+                  </div>
                 <div>
                   <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">Username (for sign in)</label>
                   <input
@@ -986,7 +999,7 @@ export const UserManagementTab: React.FC = () => {
                     value={formUsername}
                     onChange={e => setFormUsername(e.target.value)}
                     placeholder="e.g. jbosco"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
@@ -997,24 +1010,21 @@ export const UserManagementTab: React.FC = () => {
                     value={formEmail}
                     onChange={e => setFormEmail(e.target.value)}
                     placeholder="jbosco@st-silas.rw"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">Phone Number</label>
-                <input
-                  type="tel"
-                  value={formPhone}
-                  onChange={e => setFormPhone(e.target.value)}
-                  placeholder="+250 788 123 456"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
+                <div>
+                  <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">Phone Number</label>
+                  <input
+                    type="tel"
+                    value={formPhone}
+                    onChange={e => setFormPhone(e.target.value)}
+                    placeholder="+250 788 123 456"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div className="sm:col-span-2 lg:col-span-2">
+                  <div className="flex items-center justify-between mb-1">
                   <label className="block text-slate-600 dark:text-slate-300 font-bold">
                     Login Password
                   </label>
@@ -1034,28 +1044,43 @@ export const UserManagementTab: React.FC = () => {
                   value={formPassword}
                   onChange={e => setFormPassword(e.target.value)}
                   placeholder="Set account password"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-mono font-bold"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-mono font-bold"
                 />
                 <span className="text-[10px] text-slate-400 block mt-1">
                   * User will be immediately authorized and active to log in directly into their dashboard.
                 </span>
               </div>
+                </div>
+              </section>
 
-              <div className="pt-2 flex justify-end gap-2">
+              <div className="pt-1 flex flex-col-reverse sm:flex-row justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                  onClick={() => {
+                    setFormFullName('');
+                    setFormEmail('');
+                    setFormUsername('');
+                    setFormPhone('+250 78');
+                    setFormRole('teacher');
+                    setFormPassword('');
+                    setFormAvatar('');
+                    setFormAvatarFileName('');
+                    setSelectedStudentIds([]);
+                    setFormTeacherType('subject_teacher');
+                    setFormClassIds([]);
+                    setFormSubjectAssignments([{ classId: '', subjectId: '' }]);
+                  }}
+                  className="rounded-full border border-slate-200 px-5 py-2.5 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer"
                 >
-                  Cancel
+                  Reset Form
                 </button>
                 <button
                   type="submit"
                   disabled={isCreating}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="rounded-full bg-gradient-to-r from-emerald-600 to-green-700 px-7 py-3 text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 cursor-pointer disabled:opacity-50"
                 >
                   {isCreating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-                  <span>Authorize & Add User</span>
+                  <span>Save User</span>
                 </button>
               </div>
             </form>
