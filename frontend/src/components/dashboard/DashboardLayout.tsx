@@ -754,7 +754,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           {activeTab === 'stock' && <BursarInventoryTab />}
 
           {activeTab === 'library' && (
-            <LibraryTab />
+            <LibraryTab managementMode={['owner', 'super_admin', 'admin', 'librarian'].includes(currentRole)} />
           )}
 
           {activeTab === 'messages' && (
