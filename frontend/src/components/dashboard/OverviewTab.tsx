@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
+import { ShareDocumentButton } from '../common/ShareDocumentButton';
 import {
   Student,
   Teacher,
@@ -640,6 +641,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               </div>
 
               <div className="flex items-center gap-2">
+                <ShareDocumentButton
+                  title="Official Term Report Card"
+                  text="St. Silas Primary School official term report card."
+                  className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs"
+                />
                 <button
                   type="button"
                   onClick={() => {

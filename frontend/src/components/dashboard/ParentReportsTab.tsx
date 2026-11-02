@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StudentMidtermReport } from '../../types';
 import { fetchStudentReports } from '../../services/api';
+import { ShareDocumentButton } from '../common/ShareDocumentButton';
 
 export const ParentReportsTab: React.FC = () => {
   const [reports, setReports] = useState<StudentMidtermReport[]>([]);
@@ -40,9 +41,16 @@ export const ParentReportsTab: React.FC = () => {
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">{report.studentName}</h3>
               <p className="text-xs text-slate-500">{report.grade} · {report.period}</p>
             </div>
-            <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
-              Attendance: {report.attendance.total ? Math.round((report.attendance.present / report.attendance.total) * 100) : 0}%
-            </span>
+            <div className="flex items-center gap-2">
+              <ShareDocumentButton
+                title={`${report.studentName} - ${report.period} Report`}
+                text={`Class: ${report.grade}. Attendance: ${report.attendance.total ? Math.round((report.attendance.present / report.attendance.total) * 100) : 0}%. ${report.teacherName}'s class-teacher report.`}
+                className="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs"
+              />
+              <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                Attendance: {report.attendance.total ? Math.round((report.attendance.present / report.attendance.total) * 100) : 0}%
+              </span>
+            </div>
           </header>
           <p className="text-xs text-slate-600 dark:text-slate-300">
             {report.attendance.total} attendance records · {report.attendance.present} present · {report.attendance.absent} absent · {report.attendance.late} late · {report.attendance.excused} excused

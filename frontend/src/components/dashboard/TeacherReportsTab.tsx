@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FileCheck2, LoaderCircle, Send } from 'lucide-react';
 import { Student } from '../../types';
 import { publishMidtermReports } from '../../services/api';
+import { ShareDocumentButton } from '../common/ShareDocumentButton';
 
 interface TeacherReportsTabProps {
   students: Student[];
@@ -113,6 +114,15 @@ export const TeacherReportsTab: React.FC<TeacherReportsTabProps> = ({ students }
         <FileCheck2 className="mt-0.5 h-4 w-4 shrink-0" />
         Published reports appear in the parent dashboard and a report summary is sent to each linked parent’s in-app messages.
       </div>
+      {success && (
+        <div className="flex justify-end">
+          <ShareDocumentButton
+            title={`${period} - Class ${selectedClassId} report`}
+            text={`Published midterm report summary for ${visibleStudents.length} pupils. ${success}`}
+            className="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs"
+          />
+        </div>
+      )}
     </section>
   );
 };

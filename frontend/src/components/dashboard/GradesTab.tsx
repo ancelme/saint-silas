@@ -3,6 +3,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Student, GradeEntry } from '../../types';
 import { Award, Printer, Download, Sparkles, X, Check, FileText, Trash2, Plus, LoaderCircle } from 'lucide-react';
 import { fetchMyTeacherAssignments, MyTeacherAssignments } from '../../services/api';
+import { ShareDocumentButton } from '../common/ShareDocumentButton';
 
 interface GradesTabProps {
   students: Student[];
@@ -503,6 +504,11 @@ export const GradesTab: React.FC<GradesTabProps> = ({
 
             {/* Actions Bar */}
             <div className="pt-4 flex justify-end gap-3 print:hidden border-t border-slate-200">
+              <ShareDocumentButton
+                title="Official Report Card"
+                text={`${currentStudent?.name || 'Pupil'} - ${selectedTerm}. Official report card from St. Silas Primary School.`}
+                className="px-5 py-2.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs"
+              />
               <button
                 type="button"
                 onClick={() => window.print()}

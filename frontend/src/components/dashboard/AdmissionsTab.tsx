@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { useLanguage } from '../../context/LanguageContext';
 import { AdmissionApplication, Student } from '../../types';
+import { ShareDocumentButton } from '../common/ShareDocumentButton';
 import {
   FileCheck,
   Plus,
@@ -880,6 +881,11 @@ export const AdmissionsTab: React.FC<AdmissionsTabProps> = ({
                   Official Admission Letter
                 </span>
                 <div className="flex gap-2">
+                  <ShareDocumentButton
+                    title="Official Admission Letter"
+                    text={`Pupil: ${selectedAdmissionForLetter.applicantName}. Grade/stream: ${selectedAdmissionForLetter.assignedStream || selectedAdmissionForLetter.applyingGrade}. Admission number: ${selectedAdmissionForLetter.applicationNumber || selectedAdmissionForLetter.id}.`}
+                    className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                  />
                   <button
                     type="button"
                     onClick={() => window.print()}

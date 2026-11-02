@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { FeeInvoice, FeePaymentRequest, Student } from '../../types';
 import { Wallet, CheckCircle2, X, Smartphone, Landmark, Banknote, ReceiptText, ShieldCheck } from 'lucide-react';
 import { fetchPaymentRequests, reviewPaymentRequest, submitParentPaymentRequest } from '../../services/api';
+import { ShareDocumentButton } from '../common/ShareDocumentButton';
 
 type PaymentMethod = 'MTN Mobile Money' | 'Airtel Money' | 'Bank Transfer' | 'Cash';
 
@@ -675,15 +676,22 @@ export const FeesTab: React.FC<FeesTabProps> = ({ fees, students = [], onRecordP
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setReceiptData(null);
-              }}
-              className="w-full py-2.5 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs"
-            >
-              Close Receipt
-            </button>
+            <div className="flex gap-2">
+              <ShareDocumentButton
+                title={`Payment receipt ${receiptData.referenceNo}`}
+                text={`Student: ${receiptData.studentName}. Invoice: ${receiptData.invoiceNo}. Amount paid: ${formatRWF(receiptData.amount)}. Method: ${receiptData.method}.`}
+                className="flex-1 justify-center px-3 py-2.5 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setReceiptData(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs"
+              >
+                Close Receipt
+              </button>
+            </div>
           </div>
         </div>
       )}
