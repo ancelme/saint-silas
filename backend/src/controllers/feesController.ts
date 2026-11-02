@@ -3,7 +3,6 @@ import { db } from '../db/index';
 import { AuthRequest, recordAuditLog } from '../middleware/auth';
 
 export async function getFees(req: AuthRequest, res: Response) {
-  let feeApplied = false;
   try {
     const userRole = req.user?.role;
     const userId = req.user?.id;
@@ -258,6 +257,7 @@ export async function getPaymentRequests(req: AuthRequest, res: Response) {
 }
 
 export async function reviewPaymentRequest(req: AuthRequest, res: Response) {
+  let feeApplied = false;
   try {
     const { decision } = req.body;
     if (!['Verified', 'Rejected'].includes(decision)) {

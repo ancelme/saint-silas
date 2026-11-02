@@ -28,14 +28,14 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api', apiRouter);
 
 // Initialize GoogleGenAI SDK per gemini_api guidelines
-const ai = new GoogleGenAI({
+const ai = process.env.GEMINI_API_KEY ? new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
   httpOptions: {
     headers: {
       'User-Agent': 'aistudio-build',
     },
   },
-});
+}) : null;
 
 // St. Silas official academic system context
 const SCHOOL_SYSTEM_INSTRUCTION = `You are the official Senior Admissions & Academic AI Secretary for St. Silas Private Primary School (École Primaire Privée St. Silas EAR Kibondo), situated in Kibondo Village, Simbwa Cell, Kabarore Sector, Gatsibo District, Eastern Province, Rwanda (REB Center Code: 530413).
@@ -75,6 +75,9 @@ function generateAuthenticSchoolReply(name?: string, message?: string, language?
 }
 
 async function callGemini(contents: string, systemInstruction: string): Promise<string> {
+  if (!ai) {
+    throw new Error('GEMINI_API_KEY is not configured on the server.');
+  }
   const response = await ai.models.generateContent({
     model: 'gemini-3.8-flash',
     contents,

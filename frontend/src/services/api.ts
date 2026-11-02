@@ -564,6 +564,40 @@ export async function createExpense(payload: {
   });
 }
 
+export async function fetchInventory() {
+  return request<{ items: any[]; movements: any[] }>('/api/inventory');
+}
+
+export async function createStockItem(payload: {
+  name: string;
+  category: string;
+  unit: string;
+  quantity: number;
+  reorderLevel: number;
+  unitCost: number;
+  location?: string;
+}) {
+  return request<{ id: string; message: string }>('/api/inventory/items', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function recordStockMovement(payload: {
+  itemId: string;
+  type: 'IN' | 'OUT';
+  quantity: number;
+  unitCost?: number;
+  referenceNo?: string;
+  recipient?: string;
+  notes?: string;
+}) {
+  return request<{ id: string; quantity: number; message: string }>('/api/inventory/movements', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 // ==========================================
 // 8. Library Management (Librarian & Owner)
 // ==========================================

@@ -41,7 +41,8 @@ import {
   MapPin,
   CheckCircle2,
   ShieldCheck,
-  Settings
+  Settings,
+  PackageOpen
 } from 'lucide-react';
 
 import { OverviewTab } from './OverviewTab';
@@ -51,6 +52,8 @@ import { TimetableTab } from './TimetableTab';
 import { AttendanceTab } from './AttendanceTab';
 import { GradesTab } from './GradesTab';
 import { FeesTab } from './FeesTab';
+import { BursarExpensesTab } from './BursarExpensesTab';
+import { BursarInventoryTab } from './BursarInventoryTab';
 import { LibraryTab } from './LibraryTab';
 import { MessagesTab } from './MessagesTab';
 import { ChatTab } from './ChatTab';
@@ -286,6 +289,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     { id: 'grades', label: t('dashGrades'), icon: Award, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'student', 'parent'] },
     { id: 'reports', label: currentRole === 'parent' ? 'Pupil Reports' : 'Midterm Reports', icon: FileText, roles: ['teacher', 'parent'] },
     { id: 'fees', label: t('dashFees'), icon: Wallet, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'accountant', 'parent', 'student'] },
+    { id: 'expenses', label: 'Expenses', icon: Wallet, roles: ['owner', 'super_admin', 'admin', 'accountant'] },
+    { id: 'stock', label: 'Stock in / out', icon: PackageOpen, roles: ['owner', 'super_admin', 'admin', 'accountant'] },
     { id: 'library', label: t('dashLibrary'), icon: BookOpen, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'librarian', 'student'] },
     { id: 'chat', label: 'Chat', icon: MessageSquare, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'accountant', 'librarian', 'parent', 'student'] },
     { id: 'ask-feedback', label: 'Ask & Feedback', icon: MessageCircleQuestion, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'accountant', 'librarian', 'parent', 'student'] },
@@ -745,6 +750,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               onDeleteFeeInvoice={onDeleteFeeInvoice}
             />
           )}
+          {activeTab === 'expenses' && <BursarExpensesTab />}
+          {activeTab === 'stock' && <BursarInventoryTab />}
 
           {activeTab === 'library' && (
             <LibraryTab />

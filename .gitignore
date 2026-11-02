@@ -6,5 +6,10 @@ coverage/
 *.log
 .env*
 !.env.example
-backend/data/*.sqlite*
+backend/data/*.sqlite-journal
+backend/data/*.sqlite-shm
+backend/data/*.sqlite-wal
 backend/server.bundle.mjs
+
+.vercel
+.env*

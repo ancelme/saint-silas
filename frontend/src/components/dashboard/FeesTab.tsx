@@ -19,7 +19,7 @@ interface FeesTabProps {
 export const FeesTab: React.FC<FeesTabProps> = ({ fees, students = [], onRecordPayment }) => {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const canRecordPayments = user?.role === 'admin' || user?.role === 'accountant';
+  const canRecordPayments = ['owner', 'super_admin', 'admin', 'accountant'].includes(user?.role || '');
   const isParent = user?.role === 'parent';
   const [activeInvoice, setActiveInvoice] = useState<FeeInvoice | null>(null);
   const [payMethod, setPayMethod] = useState<PaymentMethod>('MTN Mobile Money');

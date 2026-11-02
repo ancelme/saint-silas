@@ -160,6 +160,7 @@ export interface FeeInvoice {
   grade: string;
   level?: SchoolLevel;
   term: string;
+  academicYear?: string;
   amountTotal: number;
   amountPaid: number;
   balance?: number;

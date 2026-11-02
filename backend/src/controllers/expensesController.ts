@@ -35,6 +35,9 @@ export async function createExpense(req: AuthRequest, res: Response) {
     const id = `exp-${Date.now()}`;
     const expenseDate = date || new Date().toISOString().split('T')[0];
     const numAmount = Number(amount);
+    if (!Number.isFinite(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ error: 'Expense amount must be greater than zero' });
+    }
 
     await db.query(
       `INSERT INTO expenses (id, title, category, amount, date, receipt_no, recorded_by, notes)

@@ -56,6 +56,11 @@ import {
   createExpense
 } from '../controllers/expensesController';
 import {
+  getInventory,
+  createStockItem,
+  recordStockMovement,
+} from '../controllers/inventoryController';
+import {
   getLibraryBooks,
   createLibraryBook,
   updateLibraryBook,
@@ -180,15 +185,18 @@ router.delete('/admissions/:id', authenticateToken, requireRole('admin'), delete
 // 5. Finance, Fees & Operational Expenses (Full CRUD)
 // ==========================================
 router.get('/fees', authenticateToken, getFees);
-router.post('/fees', authenticateToken, requireRole('accountant', 'admin'), createFeeInvoice);
-router.put('/fees/:id', authenticateToken, requireRole('accountant', 'admin'), updateFeeInvoice);
-router.delete('/fees/:id', authenticateToken, requireRole('accountant', 'admin'), deleteFeeInvoice);
-router.post('/fees/payment', authenticateToken, requireRole('accountant', 'admin'), recordPayment);
+router.post('/fees', authenticateToken, requireRole('owner', 'super_admin', 'accountant', 'admin'), createFeeInvoice);
+router.put('/fees/:id', authenticateToken, requireRole('owner', 'super_admin', 'accountant', 'admin'), updateFeeInvoice);
+router.delete('/fees/:id', authenticateToken, requireRole('owner', 'super_admin', 'accountant', 'admin'), deleteFeeInvoice);
+router.post('/fees/payment', authenticateToken, requireRole('owner', 'super_admin', 'accountant', 'admin'), recordPayment);
 router.post('/fees/payment-requests', authenticateToken, requireRole('parent'), submitParentPaymentRequest);
-router.get('/fees/payment-requests', authenticateToken, requireRole('accountant', 'admin'), getPaymentRequests);
-router.put('/fees/payment-requests/:id', authenticateToken, requireRole('accountant', 'admin'), reviewPaymentRequest);
-router.get('/expenses', authenticateToken, requireRole('accountant', 'admin'), getExpenses);
-router.post('/expenses', authenticateToken, requireRole('accountant', 'admin'), createExpense);
+router.get('/fees/payment-requests', authenticateToken, requireRole('owner', 'super_admin', 'accountant', 'admin'), getPaymentRequests);
+router.put('/fees/payment-requests/:id', authenticateToken, requireRole('owner', 'super_admin', 'accountant', 'admin'), reviewPaymentRequest);
+router.get('/expenses', authenticateToken, requireRole('owner', 'super_admin', 'accountant', 'admin'), getExpenses);
+router.post('/expenses', authenticateToken, requireRole('owner', 'super_admin', 'accountant', 'admin'), createExpense);
+router.get('/inventory', authenticateToken, requireRole('owner', 'super_admin', 'accountant', 'admin'), getInventory);
+router.post('/inventory/items', authenticateToken, requireRole('owner', 'super_admin', 'accountant', 'admin'), createStockItem);
+router.post('/inventory/movements', authenticateToken, requireRole('owner', 'super_admin', 'accountant', 'admin'), recordStockMovement);
 
 // ==========================================
 // 6. Library Management (Full CRUD)
