@@ -141,6 +141,10 @@ class DatabaseManager {
     if (!attendanceColumns.rows.some(({ name }) => name === 'subject_id')) {
       await this.query(`ALTER TABLE attendance ADD COLUMN subject_id VARCHAR(36)`);
     }
+    await this.query(`CREATE UNIQUE INDEX IF NOT EXISTS unique_class_attendance_per_day
+      ON attendance (student_id, date) WHERE subject_id IS NULL`);
+    await this.query(`CREATE UNIQUE INDEX IF NOT EXISTS unique_subject_attendance_per_day
+      ON attendance (student_id, date, subject_id) WHERE subject_id IS NOT NULL`);
   }
 
   private async runBootstrapMigrations(): Promise<void> {

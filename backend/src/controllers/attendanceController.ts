@@ -173,14 +173,14 @@ export async function saveAttendance(req: AuthRequest, res: Response) {
       }
       const identity = `${studentId}:${date}:${subjectId || 'class'}`;
       const recordId = `att-${createHash('sha256').update(identity).digest('hex').slice(0, 32)}`;
-      const conflictTarget = subjectId
-        ? `(student_id, date, subject_id) WHERE subject_id IS NOT NULL`
-        : `(student_id, date) WHERE subject_id IS NULL`;
       await db.query(
         `INSERT INTO attendance (id, student_id, class_id, subject_id, date, status, remarks, recorded_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT ${conflictTarget} DO UPDATE SET
+         ON CONFLICT (id) DO UPDATE SET
            class_id = EXCLUDED.class_id,
+           student_id = EXCLUDED.student_id,
+           subject_id = EXCLUDED.subject_id,
+           date = EXCLUDED.date,
            status = EXCLUDED.status,
            remarks = EXCLUDED.remarks,
            recorded_by = EXCLUDED.recorded_by`,
