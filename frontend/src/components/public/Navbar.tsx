@@ -315,13 +315,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onNavigateToDashboar
                 >
                   {t('navLogin')}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onOpenAuth('signup')}
-                  className="px-3.5 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 rounded-xl transition-colors"
-                >
-                  Sign Up
-                </button>
                   </>
                 )}
                 <a
@@ -482,16 +475,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onNavigateToDashboar
                   className="w-full py-2.5 rounded-xl text-center text-xs font-bold border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200"
                 >
                   {t('navLogin')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    onOpenAuth('signup');
-                  }}
-                  className="w-full py-2.5 rounded-xl text-center text-xs font-bold bg-slate-800 text-white"
-                >
-                  Sign Up
                 </button>
                   </>
                 )}
