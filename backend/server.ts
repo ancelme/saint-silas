@@ -15,7 +15,6 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
-let databaseInitialization: Promise<void> | undefined;
 
 if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
   throw new Error(`Invalid PORT value "${process.env.PORT}". PORT must be an integer between 1 and 65535.`);
@@ -24,7 +23,6 @@ if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Mount full-stack REST API
 app.use('/api', apiRouter);
 
 // Initialize GoogleGenAI SDK per gemini_api guidelines
@@ -37,7 +35,6 @@ const ai = process.env.GEMINI_API_KEY ? new GoogleGenAI({
   },
 }) : null;
 
-// St. Silas official academic system context
 const SCHOOL_SYSTEM_INSTRUCTION = `You are the official Senior Admissions & Academic AI Secretary for St. Silas Private Primary School (École Primaire Privée St. Silas EAR Kibondo), situated in Kibondo Village, Simbwa Cell, Kabarore Sector, Gatsibo District, Eastern Province, Rwanda (REB Center Code: 530413).
 Motto: Knowledge, Character, and Diligence (Ubumenyi, Ubupfura, n'Umurava).
 Offerings: Nursery (ECD 1-3), Lower Primary (P1-P3), and Upper Primary (P4-P6).
@@ -56,6 +53,7 @@ function generateAuthenticSchoolReply(name?: string, message?: string, language?
     if (query.includes('frais') || query.includes('prix') || query.includes('argent') || query.includes('combien')) {
       return `${prefix}Bonjour ${parentName}. Merci d'avoir contacté l'École Primaire Privée St. Silas EAR Kibondo. Nos frais de scolarité sont structurés de façon transparente par trimestre : Maternelle (ECD 1-3) : 45 000 RWF ; Primaire Inférieur (P1-P3) : 55 000 RWF ; Primaire Supérieur (P4-P6) : 65 000 RWF (incluant le programme de cantine quotidienne chaude, matériel SET et révisions PLE). Les paiements sont acceptés via MTN Mobile Money (*182#) et compte bancaire. Le Directeur Emmanuel Twahirwa et le secrétariat sont à votre entière disposition au +250 788 765 432.`;
     }
+
     return `${prefix}Bonjour ${parentName}. Nous accusons bonne réception de votre demande auprès de l'École Primaire Privée St. Silas EAR Kibondo (Code REB : 530413). Notre établissement affiche 100% de réussite aux examens nationaux PLE et accueille les élèves de la Maternelle au P6 dans un environnement d'excellence chrétienne et culturelle (Itorero). Un membre de notre équipe administrative prendra contact avec vous, ou vous pouvez nous visiter directement au Village Kibondo, Cellule Simbwa, Secteur Kabarore.`;
   }
 
@@ -63,10 +61,10 @@ function generateAuthenticSchoolReply(name?: string, message?: string, language?
     if (query.includes('amafaranga') || query.includes('kwishyura') || query.includes('igiciro')) {
       return `${prefix}Muraho ${parentName}. Turabashimira ko mwegereye Ishuri Ryigenga rya St. Silas EAR Kibondo. Amafaranga y'ishuri ku gihembwe ateye atya: Inshuke (ECD 1-3): 45,000 Frw; Abanza yo hasi (P1-P3): 55,000 Frw; Abanza yo hejuru (P4-P6): 65,000 Frw (bikubiyemo ifunguro ry'amanywa n'igikoma, ibikoresho by'ubumenyi n'imyiteguro ya PLE). Kwishyura bikorwa neza binyuze kuri MTN MoMo (*182#). Umuyobozi w'ishuri Mwalimu Emmanuel Twahirwa arahari kubakira kuri +250 788 765 432.`;
     }
+
     return `${prefix}Muraho ${parentName}. Ubusabe bwawe bwakiriwe neza mu biro by'Umuyobozi w'Ishuri Ryigenga rya St. Silas EAR Kibondo (Kode REB: 530413). Ishuri ryacu ryatsindishije 100% mu bizamini bya Leta (PLE) kandi ryigisha abana ubumenyi, uburere bw'itorero ry'u Rwanda n'indangagaciro za Gikirisitu kuva mu Nshuke kugeza muri P6. Turakomeza kubagezaho amakuru arambuye, cyangwa musure ikigo cyacu mu Mudugudu wa Kibondo, Akagari ka Simbwa.`;
   }
 
-  // Default English
   if (query.includes('fee') || query.includes('cost') || query.includes('tuition') || query.includes('pay')) {
     return `${prefix}Dear ${parentName}, thank you for contacting St. Silas Private Primary School EAR Kibondo. Our termly tuition contributions are: Nursery (ECD 1-3): 45,000 RWF; Lower Primary (P1-P3): 55,000 RWF; Upper Primary (P4-P6): 65,000 RWF, covering daily fortified porridge, hot lunches, science kits, and PLE mock clinics. Contributions are easily payable via MTN Mobile Money (*182#) or school bank account. Head Teacher Emmanuel Twahirwa welcomes you to visit or call +250 788 765 432.`;
   }
@@ -78,18 +76,19 @@ async function callGemini(contents: string, systemInstruction: string): Promise<
   if (!ai) {
     throw new Error('GEMINI_API_KEY is not configured on the server.');
   }
+  const model = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
   const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
+    model,
     contents,
     config: {
       systemInstruction,
       temperature: 0.7,
     },
   });
+
   return response.text || '';
 }
 
-// API endpoint: Direct AI Inquiry with High Animation Response
 app.post('/api/ai/direct-inquiry', async (req: Request, res: Response) => {
   try {
     const { name, email, phone, message, subject, category, language } = req.body;
@@ -102,7 +101,7 @@ app.post('/api/ai/direct-inquiry', async (req: Request, res: Response) => {
       trackingNumber,
       aiResponse: reply,
       timestamp: new Date().toISOString(),
-      modelUsed: 'gemini-3.8-flash'
+      modelUsed: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash',
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || 'Direct inquiry failed' });
@@ -141,7 +140,7 @@ Message / Question: ${message.trim()}`;
     try {
       replyText = await callGemini(promptText, systemInstruction);
     } catch (genError) {
-      console.warn('Gemini call fell back:', genError);
+      console.warn('Gemini call failed, using fallback:', genError);
       replyText = generateAuthenticSchoolReply(name, message, language, 'gemini');
     }
 
@@ -157,25 +156,25 @@ Message / Question: ${message.trim()}`;
       timestamp: new Date().toISOString(),
       recipient: name || 'Parent',
       engineUsed: 'gemini',
-      engineLabel: 'Google Gemini 3.8 Flash',
+      engineLabel: 'Google Gemini',
       status: 'success',
     });
   } catch (error) {
     console.error('Server error handling inquiry:', error);
     const fallback = generateAuthenticSchoolReply(req.body?.name, req.body?.message, req.body?.language, 'gemini');
+
     return res.json({
       reply: fallback,
       ticketId: `KEA-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
       timestamp: new Date().toISOString(),
       recipient: req.body?.name || 'Parent',
       engineUsed: 'gemini',
-      engineLabel: 'Google Gemini 3.8 Flash',
+      engineLabel: 'Google Gemini',
       status: 'fallback_applied',
     });
   }
 });
 
-// API endpoint: AI Draft for Announcements / Parent SMS using Gemini
 app.post('/api/messages/ai-draft', async (req: Request, res: Response) => {
   try {
     const { topic, targetRole, language } = req.body;
@@ -205,7 +204,7 @@ ${langInstruction}`;
     return res.json({
       draft: draftedText,
       engineUsed: 'gemini',
-      engineLabel: 'Google Gemini 3.8 Flash',
+      engineLabel: 'Google Gemini',
     });
   } catch (error) {
     console.error('Error in AI message draft:', error);
@@ -213,17 +212,16 @@ ${langInstruction}`;
   }
 });
 
-// Explicit JSON 404 for unmatched API routes
 app.all('/api/*', (req: Request, res: Response) => {
   res.status(404).json({ error: `API endpoint ${req.method} ${req.originalUrl} not found` });
 });
 
 export function initializeApp() {
-  databaseInitialization ??= db.init().catch(error => {
-    databaseInitialization = undefined;
-    throw error;
-  });
-  return databaseInitialization;
+  if (!db || typeof db.init !== 'function') {
+    return Promise.resolve();
+  }
+
+  return db.init();
 }
 
 export { app };
@@ -263,4 +261,6 @@ async function startServer() {
 
 if (!process.env.VERCEL) {
   startServer();
+} else {
+  export default app;
 }
