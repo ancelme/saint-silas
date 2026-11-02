@@ -297,21 +297,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onNavigateToDashboar
               </button>
             ) : (
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  id="nav-login-btn"
-                  onClick={() => onOpenAuth('login')}
-                  className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-emerald-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
-                >
-                  {t('navLogin')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onOpenAuth('signup')}
-                  className="px-3.5 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 rounded-xl transition-colors"
-                >
-                  Sign Up
-                </button>
                 <a
                   href="#admissions"
                   className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-xl shadow-sm transition-colors"
@@ -451,26 +436,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onNavigateToDashboar
               </button>
             ) : (
               <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    onOpenAuth('login');
-                  }}
-                  className="w-full py-2.5 rounded-xl text-center text-xs font-bold border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200"
-                >
-                  {t('navLogin')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    onOpenAuth('signup');
-                  }}
-                  className="w-full py-2.5 rounded-xl text-center text-xs font-bold bg-slate-800 text-white"
-                >
-                  Sign Up
-                </button>
                 <a
                   href="#admissions"
                   onClick={() => setMobileMenuOpen(false)}

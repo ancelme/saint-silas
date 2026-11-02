@@ -204,7 +204,24 @@ export function saveTimetable(req: AuthRequest, res: Response) {
   if (!isTimetable(req.body?.items)) {
     return res.status(400).json({ error: 'Timetable entries are invalid' });
   }
-  return saveContent('timetable', req.body.items, req, res);
+  const defaultPeriods = [
+    '08:30-08:45', '08:45-09:25', '09:25-10:05', '10:05-10:45',
+    '10:45-11:00', '11:00-11:40', '11:40-12:20', '12:20-13:25',
+    '13:25-14:05', '14:05-14:45', '14:45-15:25', '15:25-15:40',
+    '15:40-16:20', '16:20-17:00',
+  ];
+  const clockMinutes = (value: string) => {
+    const match = value.match(/(\d{1,2})[:.](\d{2})/);
+    return match ? Number(match[1]) * 60 + Number(match[2]) : Number.MAX_SAFE_INTEGER;
+  };
+  const normalizedItems = req.body.items.map((item: any) => {
+    const start = clockMinutes(item.period || '');
+    const period = defaultPeriods.reduce((nearest, candidate) =>
+      Math.abs(clockMinutes(candidate) - start) < Math.abs(clockMinutes(nearest) - start) ? candidate : nearest,
+      defaultPeriods[0]);
+    return { ...item, period };
+  });
+  return saveContent('timetable', normalizedItems, req, res);
 }
 
 export function getSchoolEvents(_req: AuthRequest, res: Response) {

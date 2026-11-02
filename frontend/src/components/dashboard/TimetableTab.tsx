@@ -30,6 +30,36 @@ interface TimetableTabProps {
 
 const days: TimetableSlot['day'][] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
+export const DEFAULT_TIMETABLE_PERIODS = [
+  '08:30-08:45',
+  '08:45-09:25',
+  '09:25-10:05',
+  '10:05-10:45',
+  '10:45-11:00',
+  '11:00-11:40',
+  '11:40-12:20',
+  '12:20-13:25',
+  '13:25-14:05',
+  '14:05-14:45',
+  '14:45-15:25',
+  '15:25-15:40',
+  '15:40-16:20',
+  '16:20-17:00',
+];
+
+const clockMinutes = (value: string) => {
+  const match = value.match(/(\d{1,2})[:.](\d{2})/);
+  return match ? Number(match[1]) * 60 + Number(match[2]) : Number.MAX_SAFE_INTEGER;
+};
+
+const canonicalPeriod = (value: string) => {
+  const start = clockMinutes(value);
+  if (!Number.isFinite(start)) return DEFAULT_TIMETABLE_PERIODS[0];
+  return DEFAULT_TIMETABLE_PERIODS.reduce((nearest, period) =>
+    Math.abs(clockMinutes(period) - start) < Math.abs(clockMinutes(nearest) - start) ? period : nearest,
+  DEFAULT_TIMETABLE_PERIODS[0]);
+};
+
 const gradeOptions = [
   { label: 'Primary 1 (P1)', value: 'Primary 1' },
   { label: 'Primary 2 (P2)', value: 'Primary 2' },
@@ -86,7 +116,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ timetable, currentUs
   const canManageTimetable = ['owner', 'super_admin', 'admin', 'head_teacher'].includes(currentUserRole);
   const [form, setForm] = useState<Omit<TimetableSlot, 'id'>>({
     day: 'Monday',
-    period: '',
+    period: DEFAULT_TIMETABLE_PERIODS[0],
     subject: '',
     teacherName: '',
     classroom: '',
@@ -127,6 +157,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ timetable, currentUs
     setSaveError('');
     const updatedSlot: TimetableSlot = {
       ...form,
+      period: canonicalPeriod(form.period),
       id: editingSlot?.id || `slot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     };
     const updatedTimetable = editingSlot
@@ -134,7 +165,7 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ timetable, currentUs
       : [...timetable, updatedSlot];
 
     try {
-      await onSaveTimetable(updatedTimetable);
+      await onSaveTimetable(updatedTimetable.map(slot => ({ ...slot, period: canonicalPeriod(slot.period) })));
       setIsEditorOpen(false);
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Could not save this timetable entry.');
@@ -157,17 +188,16 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ timetable, currentUs
   };
 
   const gradeSlots = useMemo(
-    () => timetable.filter(slot =>
-      slot.grade === selectedGrade ||
-      (selectedGrade.startsWith('Nursery') && slot.level === 'Nursery')
-    ),
+    () => timetable
+      .filter(slot =>
+        slot.grade === selectedGrade ||
+        (selectedGrade.startsWith('Nursery') && slot.level === 'Nursery')
+      )
+      .map(slot => ({ ...slot, period: canonicalPeriod(slot.period) })),
     [selectedGrade, timetable],
   );
 
-  const periods = useMemo(() => {
-    const periodNames = Array.from(new Set(gradeSlots.map(slot => slot.period)));
-    return periodNames.sort((left, right) => startTimeMinutes(left) - startTimeMinutes(right));
-  }, [gradeSlots]);
+  const periods = DEFAULT_TIMETABLE_PERIODS;
 
   const getSlot = (day: TimetableSlot['day'], period: string) =>
     gradeSlots.find(slot => slot.day === day && slot.period === period);
@@ -390,7 +420,9 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ timetable, currentUs
               </label>
               <label className="space-y-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
                 Time / period
-                <input required maxLength={50} value={form.period} onChange={event => setForm(current => ({ ...current, period: event.target.value }))} placeholder="08:00 AM - 09:00 AM" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+                <select required value={canonicalPeriod(form.period)} onChange={event => setForm(current => ({ ...current, period: event.target.value }))} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                  {DEFAULT_TIMETABLE_PERIODS.map(period => <option key={period} value={period}>{period}</option>)}
+                </select>
               </label>
               <label className="space-y-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
                 Subject or activity
