@@ -12,6 +12,7 @@ import { INITIAL_BOOKS } from '../../data/mockData';
 
 interface LibraryTabProps {
   managementMode?: boolean;
+  dashboardView?: boolean;
 }
 
 type LibraryPage = 'books' | 'members' | 'borrowing' | 'returns' | 'overdue' | 'reports';
@@ -34,7 +35,7 @@ const pages: { id: LibraryPage; label: string; icon: React.ElementType }[] = [
   { id: 'reports', label: 'Library Reports Management', icon: Download },
 ];
 
-export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false }) => {
+export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false, dashboardView = false }) => {
   const [activePage, setActivePage] = useState<LibraryPage>('books');
   const [books, setBooks] = useState<LibraryBook[]>([]);
   const [borrowings, setBorrowings] = useState<BorrowingRecord[]>([]);
@@ -196,6 +197,105 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false }
     }} />;
   }
 
+  if (dashboardView) {
+    const dashboardStatCards = [
+      { label: 'Total Books', value: books.reduce((sum, book) => sum + book.totalCopies, 0).toLocaleString(), trend: '12%', icon: BookOpen, gradient: 'from-blue-500 to-blue-700', shadow: 'shadow-blue-500/25' },
+      { label: 'Library Members', value: members.length.toLocaleString(), trend: '8%', icon: Users, gradient: 'from-emerald-500 to-green-600', shadow: 'shadow-emerald-500/25' },
+      { label: 'Current Loans', value: activeLoans.length.toLocaleString(), trend: '5%', icon: RotateCcw, gradient: 'from-violet-500 to-purple-600', shadow: 'shadow-violet-500/25' },
+      { label: 'Overdue Books', value: overdue.length.toLocaleString(), trend: '2%', icon: AlertTriangle, gradient: 'from-orange-400 to-orange-600', shadow: 'shadow-orange-500/25' },
+    ];
+    const categoryCounts = books.reduce<Record<string, number>>((counts, book) => {
+      const category = book.category || 'Others';
+      counts[category] = (counts[category] || 0) + book.totalCopies;
+      return counts;
+    }, {});
+    const categories = Object.entries(categoryCounts).slice(0, 4);
+
+    return (
+      <section className="space-y-5">
+        <header className="rounded-3xl border border-blue-100 bg-white px-5 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xl font-black text-blue-950 dark:text-white">Welcome Back, Librarian! <span className="text-amber-400">👋</span></p>
+          <p className="mt-1 text-xs font-semibold text-slate-500">Manage books, members and library activities efficiently.</p>
+        </header>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {dashboardStatCards.map(stat => (
+            <article key={stat.label} className={`relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br ${stat.gradient} p-5 text-white shadow-lg ${stat.shadow}`}>
+              <stat.icon className="absolute -bottom-2 -right-1 h-24 w-24 rotate-[-8deg] opacity-15" />
+              <div className="relative flex items-start justify-between">
+                <div><p className="text-sm font-bold text-white/90">{stat.label}</p><p className="mt-1 text-3xl font-black">{stat.value}</p></div>
+                <stat.icon className="h-9 w-9" />
+              </div>
+              <p className="relative mt-2 text-xs font-bold text-white/90">↑ {stat.trend}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+          <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between"><h2 className="flex items-center gap-2 font-black text-blue-950 dark:text-white"><span className="h-7 w-1 rounded-full bg-blue-600" />Library Activity Overview</h2><span className="text-xs font-bold text-blue-700">This Month⌄</span></div>
+            <div className="mt-5 h-52">
+              <svg viewBox="0 0 700 220" className="h-full w-full" role="img" aria-label="Library borrowing and returns chart">
+                {[30, 75, 120, 165].map(y => <line key={y} x1="40" x2="680" y1={y} y2={y} stroke="currentColor" className="text-slate-200 dark:text-slate-800" />)}
+                <path d="M42 165 C95 150 125 125 180 115 S260 58 325 75 S420 122 490 62 S590 32 670 78" fill="none" stroke="#3b82f6" strokeWidth="4" />
+                <path d="M42 185 C105 172 130 146 180 137 S260 95 325 105 S420 124 490 100 S590 75 670 105" fill="none" stroke="#22c55e" strokeWidth="4" />
+                {[42, 180, 325, 490, 670].map((x, index) => <circle key={x} cx={x} cy={[165,115,75,62,78][index]} r="5" fill="#3b82f6" />)}
+                {[42,180,325,490,670].map((x,index)=><circle key={`g-${x}`} cx={x} cy={[185,137,105,100,105][index]} r="5" fill="#22c55e" />)}
+              </svg>
+            </div>
+          </article>
+
+          <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="flex items-center gap-2 font-black text-blue-950 dark:text-white"><span className="text-yellow-400">⚡</span> Quick Actions</h2>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <QuickAction label="Add Book" icon={BookOpen} colors="from-blue-600 to-blue-800" onClick={() => setShowBookModal(true)} />
+              <QuickAction label="Register Member" icon={Users} colors="from-emerald-500 to-green-700" onClick={() => setActivePage('members')} />
+              <QuickAction label="Record Borrowing" icon={RotateCcw} colors="from-purple-500 to-purple-700" onClick={() => setShowBorrowModal(true)} />
+              <QuickAction label="Record Return" icon={RotateCcw} colors="from-orange-400 to-orange-600" onClick={() => setActivePage('returns')} />
+            </div>
+          </article>
+        </div>
+
+        <div className="grid gap-5 lg:grid-cols-3">
+          <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="font-black text-blue-950 dark:text-white">Books by Category</h2>
+            <div className="mt-5 flex items-center gap-5">
+              <div className="relative h-36 w-36 rounded-full" style={{ background: 'conic-gradient(#3b82f6 0 35%, #22c55e 35% 63%, #f59e0b 63% 83%, #8b5cf6 83% 100%)' }}>
+                <div className="absolute inset-7 grid place-items-center rounded-full bg-white text-center dark:bg-slate-900"><div><strong className="text-xl">{books.reduce((sum, book) => sum + book.totalCopies, 0).toLocaleString()}</strong><small className="block text-[10px] text-slate-500">Total Books</small></div></div>
+              </div>
+              <div className="space-y-2 text-xs">{['Textbooks','Literature','Science','Others'].map((category,index)=><div key={category} className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{background:['#3b82f6','#22c55e','#f59e0b','#8b5cf6'][index]}}/><span className="text-slate-500">{category}</span><strong className="ml-auto">{[35,28,20,17][index]}%</strong></div>)}</div>
+            </div>
+          </article>
+
+          <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="font-black text-blue-950 dark:text-white">Recent Books</h2>
+            <div className="mt-4 space-y-3">{books.slice(0, 3).map(book => <div key={book.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800"><div className="grid h-12 w-10 place-items-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-800 text-white"><BookOpen className="h-5 w-5" /></div><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{book.title}</p><p className="truncate text-[10px] text-slate-500">by {book.author}</p></div><span className="rounded-lg bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-700">Available</span></div>)}</div>
+          </article>
+
+          <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h2 className="font-black text-blue-950 dark:text-white">Recent Activities</h2>
+            <div className="mt-4 space-y-3">{[
+              ['New book added to the catalog', '2 hours ago', BookOpen, 'bg-blue-500'],
+              [`${activeLoans.length} books are currently borrowed`, '3 hours ago', Users, 'bg-emerald-500'],
+              [`${returned.length} books have been returned`, '5 hours ago', RotateCcw, 'bg-orange-500'],
+              [`${overdue.length} overdue books need attention`, '7 hours ago', AlertTriangle, 'bg-purple-500'],
+            ].map(([text,time,Icon,color]) => <div key={String(text)} className="flex items-center gap-3 text-xs"><div className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-white ${String(color)}`}>{React.createElement(Icon as React.ElementType, { className:'h-4 w-4' })}</div><div className="min-w-0 flex-1"><p className="font-bold text-slate-700 dark:text-slate-200">{String(text)}</p></div><span className="shrink-0 text-[10px] text-slate-400">{String(time)}</span></div>)}</div>
+          </article>
+        </div>
+
+        {showBookModal && <Modal title="Add Library Book" onClose={() => setShowBookModal(false)}>
+          <form onSubmit={addBook} className="grid gap-4 sm:grid-cols-2">
+            {[['title','Book title'],['author','Author'],['isbn','ISBN'],['location','Shelf location']].map(([field,label]) => <FormField key={field} label={label} value={(bookForm as any)[field]} onChange={value => setBookForm({...bookForm,[field]:value})} />)}
+            <label className="text-xs font-bold text-slate-600">Category<select value={bookForm.category} onChange={event => setBookForm({...bookForm,category:event.target.value})} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm"><option>Textbook</option><option>Storybook</option><option>Reference</option><option>Fiction</option><option>General Knowledge</option></select></label>
+            <FormField label="Number of copies" type="number" value={String(bookForm.totalCopies)} onChange={value => setBookForm({...bookForm,totalCopies:Number(value)})} />
+            <div className="sm:col-span-2 flex justify-end gap-3"><button type="button" onClick={()=>setShowBookModal(false)} className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-500">Cancel</button><button disabled={saving} className="rounded-xl bg-indigo-700 px-5 py-2.5 text-sm font-bold text-white">{saving ? 'Saving...' : 'Add Book'}</button></div>
+          </form>
+        </Modal>}
+        {showBorrowModal && <Modal title="Issue Book" onClose={() => setShowBorrowModal(false)}><form onSubmit={issueBook} className="space-y-4"><label className="text-xs font-bold text-slate-600">Available book<select value={borrowForm.bookId} onChange={event=>setBorrowForm({...borrowForm,bookId:event.target.value})} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm"><option value="">Select a book</option>{books.filter(book=>book.availableCopies>0).map(book=><option key={book.id} value={book.id}>{book.title}</option>)}</select></label><FormField label="Borrower name" value={borrowForm.borrowerName} onChange={value=>setBorrowForm({...borrowForm,borrowerName:value})}/><div className="flex justify-end gap-3"><button type="button" onClick={()=>setShowBorrowModal(false)} className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-500">Cancel</button><button disabled={saving} className="rounded-xl bg-indigo-700 px-5 py-2.5 text-sm font-bold text-white">{saving?'Issuing...':'Issue Book'}</button></div></form></Modal>}
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-6">
       <header className="overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950 via-purple-900 to-violet-800 text-white shadow-xl">
@@ -343,6 +443,12 @@ const LoadingRows = () => <div className="mt-4 space-y-3">{[1, 2, 3].map(item =>
 const FormField = ({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) => <label className="text-xs font-bold text-slate-600">{label}<input required type={type} min={type === 'number' ? 1 : undefined} value={value} onChange={event => onChange(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm" /></label>;
 const Modal = ({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) => <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"><div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900"><div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-black">{title}</h2><button type="button" onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>{children}</div></div>;
 const ReportCard = ({ label, value }: { label: string; value: React.ReactNode }) => <div className="rounded-2xl bg-slate-50 p-5 dark:bg-slate-800"><p className="text-2xl font-black">{value}</p><p className="mt-1 text-xs font-semibold text-slate-500">{label}</p></div>;
+const QuickAction = ({ label, icon: Icon, colors, onClick }: { label: string; icon: React.ElementType; colors: string; onClick: () => void }) => (
+  <button type="button" onClick={onClick} className={`group flex min-h-24 items-center gap-3 rounded-2xl bg-gradient-to-br ${colors} p-4 text-left text-white shadow-lg transition hover:-translate-y-0.5`}>
+    <Icon className="h-8 w-8 shrink-0" />
+    <span className="text-sm font-black leading-tight">{label}</span>
+  </button>
+);
 const CheckIcon = () => <BookOpen className="h-10 w-10 text-emerald-600" />;
 const EmptyState = ({ icon: Icon, title, detail }: { icon: React.ElementType; title: string; detail: string }) => <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 py-12 text-center"><Icon /><p className="mt-3 font-black text-slate-800">{title}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></div>;
 
