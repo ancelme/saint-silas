@@ -13,6 +13,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import heroImage from '../../assets/images/hero_rwandan_students_1790692869644.jpg';
+import { useSchoolSettings } from '../../context/SchoolSettingsContext';
 
 interface HeroProps {
   onOpenAuth: (tab?: 'login') => void;
@@ -21,6 +22,7 @@ interface HeroProps {
 
 export const Hero: React.FC<HeroProps> = ({ onOpenAuth, onOpenMap }) => {
   const { t } = useLanguage();
+  const { settings } = useSchoolSettings();
   const [currentTime, setCurrentTime] = useState<string>('');
   const [sessionStatus, setSessionStatus] = useState<string>('morning');
 
@@ -219,7 +221,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenAuth, onOpenMap }) => {
           <div className="lg:col-span-5 relative">
             <div className="relative rounded-3xl overflow-hidden border-2 border-emerald-600/30 bg-white dark:bg-slate-900 shadow-2xl shadow-emerald-950/20 group">
               <img
-                src={heroImage}
+                src={settings.home_hero_image || heroImage}
                 alt="Joyful Rwandan primary school pupils at St. Silas EAR Kibondo in Gatsibo"
                 className="w-full h-84 sm:h-[430px] object-cover group-hover:scale-[1.02] transition-transform duration-500"
                 referrerPolicy="no-referrer"

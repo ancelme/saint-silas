@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLanguage } from '../../context/LanguageContext';
+import { useSchoolSettings } from '../../context/SchoolSettingsContext';
 import { GraduationCap, ShieldCheck, MapPin, Phone, Mail } from 'lucide-react';
 
 interface FooterProps {
@@ -8,6 +9,7 @@ interface FooterProps {
 
 export const Footer: React.FC<FooterProps> = ({ onOpenAuth }) => {
   const { t } = useLanguage();
+  const { settings } = useSchoolSettings();
 
   return (
     <footer className="bg-slate-900 text-slate-300 border-t border-slate-800">
@@ -20,7 +22,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth }) => {
                 <GraduationCap className="w-6 h-6" />
               </div>
               <span className="text-lg font-bold tracking-tight text-white font-heading">
-                {t('schoolName')}
+                {settings.school_name || t('schoolName')}
               </span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
@@ -101,7 +103,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth }) => {
         {/* Bottom Bar */}
         <div className="mt-10 pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <p>
-            &copy; {new Date().getFullYear()} {t('schoolName')}. {t('allRightsReserved')}
+            &copy; {new Date().getFullYear()} {settings.school_name || t('schoolName')}. {t('allRightsReserved')}
           </p>
           <p className="text-center sm:text-right leading-relaxed">
             Developed by <strong className="text-slate-400">NDAYISHIMIYE INNOCENT</strong> from Gatsibo

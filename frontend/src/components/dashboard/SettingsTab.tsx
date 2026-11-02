@@ -76,15 +76,32 @@ export const SettingsTab: React.FC = () => {
     if (!['owner', 'super_admin', 'admin'].includes(user?.role || '')) return;
     setIsSavingSettings(true);
     try {
-      const keys = ['tuition_nursery', 'tuition_lower_primary', 'tuition_upper_primary', 'term_1_dates', 'term_2_dates', 'term_3_dates'];
+      const keys = [
+        'school_name', 'school_motto', 'tuition_nursery', 'tuition_lower_primary',
+        'tuition_upper_primary', 'term_1_dates', 'term_2_dates', 'term_3_dates',
+        'home_hero_image', 'home_itorero_image', 'home_nursery_image',
+        'home_stem_image', 'home_lunch_image', 'school_success_records'
+      ];
       await Promise.all(keys.map(key => updateSystemSetting(key, settings[key] || '')));
-      setToastMsg({ type: 'success', text: 'School fees and academic term dates updated.' });
+      window.dispatchEvent(new Event('st-silas:school-settings-updated'));
+      setToastMsg({ type: 'success', text: 'School identity, fees, home images, and annual success records updated.' });
       setTimeout(() => setToastMsg(null), 4000);
     } catch (error: any) {
       setToastMsg({ type: 'error', text: error.message || 'Failed to save school parameters.' });
     } finally {
       setIsSavingSettings(false);
     }
+  };
+
+  const uploadHomeImage = (key: string, file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/') || file.size > 4 * 1024 * 1024) {
+      setToastMsg({ type: 'error', text: 'Select an image smaller than 4 MB.' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setSettings(previous => ({ ...previous, [key]: String(reader.result || '') }));
+    reader.readAsDataURL(file);
   };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
@@ -226,10 +243,49 @@ export const SettingsTab: React.FC = () => {
               <label className="block text-slate-500 font-semibold mb-1">Official Legal Name</label>
               <input
                 type="text"
-                disabled
                 value={settings.school_name || 'St. Silas Private Primary School'}
                 className="w-full px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium"
+                onChange={event => setSettings(previous => ({ ...previous, school_name: event.target.value }))}
               />
+            </div>
+            <div>
+              <label className="block text-slate-500 font-semibold mb-1">School Motto</label>
+              <input
+                type="text"
+                value={settings.school_motto || ''}
+                placeholder="Knowledge, Character, and Diligence"
+                onChange={event => setSettings(previous => ({ ...previous, school_motto: event.target.value }))}
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-500 font-semibold mb-1">Annual School Success Records (JSON)</label>
+              <textarea
+                rows={4}
+                value={settings.school_success_records || '[{"year":"2024/2025","passRate":"100%","meanScore":"76.04%","transition":"100%"}]'}
+                onChange={event => setSettings(previous => ({ ...previous, school_success_records: event.target.value }))}
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 font-mono text-[11px]"
+              />
+              <p className="mt-1 text-[10px] text-slate-400">Add one object per academic year with year, passRate, meanScore, and transition.</p>
+            </div>
+
+            <div>
+              <label className="block text-slate-500 font-semibold mb-2">Public Home Images</label>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {[
+                  ['home_hero_image', 'Main hero image'],
+                  ['home_itorero_image', 'Itorero image'],
+                  ['home_nursery_image', 'Nursery image'],
+                  ['home_stem_image', 'STEM image'],
+                  ['home_lunch_image', 'Nutrition image'],
+                ].map(([key, label]) => (
+                  <label key={key} className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-850">
+                    <span className="mb-1 block text-[10px] font-bold text-slate-500">{label}</span>
+                    <input type="file" accept="image/*" onChange={event => uploadHomeImage(key, event.target.files?.[0])} className="block w-full text-[10px] file:mr-2 file:rounded-lg file:border-0 file:bg-emerald-100 file:px-2 file:py-1 file:text-[10px] file:font-bold file:text-emerald-700" />
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -297,7 +353,7 @@ export const SettingsTab: React.FC = () => {
                 className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
               >
                 {isSavingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Save fees and academic dates
+                Save school website settings
               </button>
             )}
           </div>

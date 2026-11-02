@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSchoolSettings } from '../../context/SchoolSettingsContext';
 import { useLanguage } from '../../context/LanguageContext';
 import confetti from 'canvas-confetti';
 import {
@@ -19,6 +20,8 @@ interface NationalSuccessProps {
 
 export const NationalSuccess: React.FC<NationalSuccessProps> = ({ onOpenAuth }) => {
   const { t } = useLanguage();
+  const { getSuccessRecords } = useSchoolSettings();
+  const latestSuccess = getSuccessRecords[getSuccessRecords.length - 1];
 
   const handleCelebrate = () => {
     confetti({
@@ -89,14 +92,14 @@ export const NationalSuccess: React.FC<NationalSuccessProps> = ({ onOpenAuth }) 
           <div className="p-6 rounded-3xl bg-slate-800/80 border border-slate-700/80 hover:border-amber-400/60 transition-all shadow-xl group">
             <div className="flex items-center justify-between mb-4">
               <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
-                NESA 2024/2025 PLE
+                NESA {latestSuccess?.year || '2024/2025'} PLE
               </span>
               <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center">
                 <Award className="w-5 h-5" />
               </div>
             </div>
             <div className="text-4xl font-extrabold text-white font-mono tabular-nums mb-2">
-              100%
+              {latestSuccess?.passRate || '100%'}
             </div>
             <h3 className="text-sm font-bold text-slate-100 mb-1">
               {t('metricPlePass')}
@@ -117,7 +120,7 @@ export const NationalSuccess: React.FC<NationalSuccessProps> = ({ onOpenAuth }) 
               </div>
             </div>
             <div className="text-4xl font-extrabold text-white font-mono tabular-nums mb-2">
-              76.04%
+              {latestSuccess?.meanScore || '76.04%'}
             </div>
             <h3 className="text-sm font-bold text-slate-100 mb-1">
               {t('metricMeanScore')}
@@ -138,7 +141,7 @@ export const NationalSuccess: React.FC<NationalSuccessProps> = ({ onOpenAuth }) 
               </div>
             </div>
             <div className="text-4xl font-extrabold text-white font-mono tabular-nums mb-2">
-              100%
+              {latestSuccess?.transition || '100%'}
             </div>
             <h3 className="text-sm font-bold text-slate-100 mb-1">
               {t('metricTransition')}

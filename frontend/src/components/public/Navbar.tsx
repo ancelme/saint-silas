@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useSchoolSettings } from '../../context/SchoolSettingsContext';
 import { Language } from '../../types';
 import {
   GraduationCap,
@@ -30,6 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onNavigateToDashboar
   const { language, setLanguage, t } = useLanguage();
   const { theme, toggleTheme, setTheme } = useTheme();
   const { user, isAuthenticated } = useAuth();
+  const { settings } = useSchoolSettings();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [pagesDropdownOpen, setPagesDropdownOpen] = useState(false);
@@ -122,7 +124,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth, onNavigateToDashboar
             </div>
             <div>
               <span className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white block font-heading leading-tight">
-                {t('schoolName')}
+                {settings.school_name || t('schoolName')}
               </span>
               <button
                 type="button"

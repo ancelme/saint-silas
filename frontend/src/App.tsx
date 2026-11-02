@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SchoolSettingsProvider } from './context/SchoolSettingsContext';
 import { Navbar } from './components/public/Navbar';
 import { Hero } from './components/public/Hero';
 import { About } from './components/public/About';
@@ -645,8 +646,10 @@ export default function App() {
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
-          <MainApp />
-          <AppSuccessToast />
+          <SchoolSettingsProvider>
+            <MainApp />
+            <AppSuccessToast />
+          </SchoolSettingsProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>

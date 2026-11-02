@@ -23,6 +23,7 @@ import itoreroImage from '../../assets/images/home_itorero_dance_1790692883162.j
 import nurseryImage from '../../assets/images/home_nursery_ecd_1790692903161.jpg';
 import stemImage from '../../assets/images/home_stem_discovery_1790692916312.jpg';
 import lunchImage from '../../assets/images/home_school_lunch_1790692929899.jpg';
+import { useSchoolSettings } from '../../context/SchoolSettingsContext';
 
 interface HomeInteractiveFeaturesProps {
   onOpenAuth: (tab?: 'login') => void;
@@ -30,6 +31,7 @@ interface HomeInteractiveFeaturesProps {
 
 export const HomeInteractiveFeatures: React.FC<HomeInteractiveFeaturesProps> = ({ onOpenAuth }) => {
   const { t } = useLanguage();
+  const { settings } = useSchoolSettings();
 
   // Active step for Daily Schedule timeline
   const [activeScheduleIdx, setActiveScheduleIdx] = useState(2); // default to 08:00 Core CBC
@@ -144,7 +146,7 @@ export const HomeInteractiveFeatures: React.FC<HomeInteractiveFeaturesProps> = (
           <div className="md:col-span-7 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow group flex flex-col justify-between">
             <div className="relative h-64 sm:h-72 overflow-hidden bg-slate-100 dark:bg-slate-850">
               <img
-                src={itoreroImage}
+                src={settings.home_itorero_image || itoreroImage}
                 alt="Rwandan primary school pupils performing traditional Itorero cultural dance"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
@@ -168,7 +170,7 @@ export const HomeInteractiveFeatures: React.FC<HomeInteractiveFeaturesProps> = (
           <div className="md:col-span-5 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow group flex flex-col justify-between">
             <div className="relative h-64 sm:h-72 overflow-hidden bg-slate-100 dark:bg-slate-850">
               <img
-                src={nurseryImage}
+                src={settings.home_nursery_image || nurseryImage}
                 alt="Young Rwandan nursery school children learning with educational blocks"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
@@ -192,7 +194,7 @@ export const HomeInteractiveFeatures: React.FC<HomeInteractiveFeaturesProps> = (
           <div className="md:col-span-5 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow group flex flex-col justify-between">
             <div className="relative h-60 sm:h-64 overflow-hidden bg-slate-100 dark:bg-slate-850">
               <img
-                src={stemImage}
+                src={settings.home_stem_image || stemImage}
                 alt="Rwandan primary students doing practical science experiments with their teacher"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
@@ -216,7 +218,7 @@ export const HomeInteractiveFeatures: React.FC<HomeInteractiveFeaturesProps> = (
           <div className="md:col-span-7 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow group flex flex-col justify-between">
             <div className="relative h-60 sm:h-64 overflow-hidden bg-slate-100 dark:bg-slate-850">
               <img
-                src={lunchImage}
+                src={settings.home_lunch_image || lunchImage}
                 alt="Smiling Rwandan children enjoying warm school lunch and milk porridge"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 referrerPolicy="no-referrer"
