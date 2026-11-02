@@ -103,9 +103,11 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth }) => {
           <p>
             &copy; {new Date().getFullYear()} {t('schoolName')}. {t('allRightsReserved')}
           </p>
-          <div className="flex items-center gap-1">
-            <span>{t('mottoShort')}</span>
-          </div>
+          <p className="text-center sm:text-right leading-relaxed">
+            Developed by <strong className="text-slate-400">NDAYISHIMIYE INNOCENT</strong> from Gatsibo
+            <br />
+            Contact: 07283717185 / 0781811662
+          </p>
         </div>
       </div>
     </footer>
