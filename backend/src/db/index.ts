@@ -145,6 +145,81 @@ class DatabaseManager {
       ON attendance (student_id, date) WHERE subject_id IS NULL`);
     await this.query(`CREATE UNIQUE INDEX IF NOT EXISTS unique_subject_attendance_per_day
       ON attendance (student_id, date, subject_id) WHERE subject_id IS NOT NULL`);
+    await this.runSocialMigrations();
+  }
+
+  private async runSocialMigrations(): Promise<void> {
+    await this.query(`CREATE TABLE IF NOT EXISTS chat_groups (
+      id VARCHAR(36) PRIMARY KEY, name VARCHAR(150) NOT NULL, description TEXT,
+      avatar_url TEXT, created_by VARCHAR(36) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+    await this.query(`CREATE TABLE IF NOT EXISTS chat_group_members (
+      group_id VARCHAR(36) NOT NULL, user_id VARCHAR(36) NOT NULL,
+      role VARCHAR(20) DEFAULT 'member', joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (group_id, user_id))`);
+    await this.query(`CREATE TABLE IF NOT EXISTS chat_group_messages (
+      id VARCHAR(36) PRIMARY KEY, group_id VARCHAR(36) NOT NULL, sender_id VARCHAR(36) NOT NULL,
+      body TEXT NOT NULL, attachments TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+    await this.query(`CREATE TABLE IF NOT EXISTS social_posts (
+      id VARCHAR(36) PRIMARY KEY, user_id VARCHAR(36) NOT NULL, content TEXT,
+      audience VARCHAR(50) DEFAULT 'Everyone', is_announcement SMALLINT DEFAULT 0,
+      announcement_type VARCHAR(50) DEFAULT 'General', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+    await this.query(`CREATE TABLE IF NOT EXISTS post_media (
+      id VARCHAR(36) PRIMARY KEY, post_id VARCHAR(36) NOT NULL, media_type VARCHAR(30) DEFAULT 'image',
+      url TEXT NOT NULL, file_name VARCHAR(255), sort_order INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+    await this.query(`CREATE TABLE IF NOT EXISTS post_likes (
+      id VARCHAR(36) PRIMARY KEY, post_id VARCHAR(36) NOT NULL, user_id VARCHAR(36) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(post_id, user_id))`);
+    await this.query(`CREATE TABLE IF NOT EXISTS post_comments (
+      id VARCHAR(36) PRIMARY KEY, post_id VARCHAR(36) NOT NULL, user_id VARCHAR(36) NOT NULL,
+      parent_comment_id VARCHAR(36), content TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+    await this.query(`CREATE TABLE IF NOT EXISTS comment_replies (
+      id VARCHAR(36) PRIMARY KEY, comment_id VARCHAR(36) NOT NULL, user_id VARCHAR(36) NOT NULL,
+      content TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+    await this.query(`CREATE TABLE IF NOT EXISTS stories (
+      id VARCHAR(36) PRIMARY KEY, user_id VARCHAR(36) NOT NULL, media_url TEXT,
+      media_type VARCHAR(30) DEFAULT 'text', content TEXT, caption TEXT,
+      background VARCHAR(100) DEFAULT '#047857', privacy VARCHAR(30) DEFAULT 'everyone',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, expires_at TIMESTAMP NOT NULL)`);
+    await this.query(`CREATE TABLE IF NOT EXISTS story_views (
+      id VARCHAR(36) PRIMARY KEY, story_id VARCHAR(36) NOT NULL, user_id VARCHAR(36) NOT NULL,
+      viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(story_id, user_id))`);
+    await this.query(`CREATE TABLE IF NOT EXISTS story_reactions (
+      id VARCHAR(36) PRIMARY KEY, story_id VARCHAR(36) NOT NULL, user_id VARCHAR(36) NOT NULL,
+      reaction VARCHAR(16) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(story_id, user_id))`);
+    await this.query(`CREATE TABLE IF NOT EXISTS story_privacy (
+      user_id VARCHAR(36) PRIMARY KEY, allowed_roles TEXT, blocked_user_ids TEXT)`);
+    await this.query(`CREATE TABLE IF NOT EXISTS post_notifications (
+      id VARCHAR(36) PRIMARY KEY, recipient_id VARCHAR(36) NOT NULL, actor_id VARCHAR(36) NOT NULL,
+      post_id VARCHAR(36), type VARCHAR(30) NOT NULL, is_read SMALLINT DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+    await this.query(`CREATE TABLE IF NOT EXISTS social_role_permissions (
+      role VARCHAR(50) PRIMARY KEY, can_post SMALLINT DEFAULT 1, can_comment SMALLINT DEFAULT 1,
+      can_story SMALLINT DEFAULT 1, can_announce SMALLINT DEFAULT 0)`);
+    const permissions = [
+      ['owner', 1, 1, 1, 1], ['super_admin', 1, 1, 1, 1], ['admin', 1, 1, 1, 1],
+      ['head_teacher', 1, 1, 1, 1], ['teacher', 1, 1, 1, 0], ['accountant', 1, 1, 1, 1],
+      ['librarian', 1, 1, 1, 1], ['parent', 1, 1, 1, 0], ['student', 1, 1, 1, 0],
+    ];
+    for (const [role, canPost, canComment, canStory, canAnnounce] of permissions) {
+      if (this.databaseEngine === 'sqlite') {
+        await this.query(
+          `INSERT OR IGNORE INTO social_role_permissions (role, can_post, can_comment, can_story, can_announce)
+           VALUES (?, ?, ?, ?, ?)`,
+          [role, canPost, canComment, canStory, canAnnounce],
+        );
+      } else {
+        await this.query(
+          `INSERT INTO social_role_permissions (role, can_post, can_comment, can_story, can_announce)
+           VALUES (?, ?, ?, ?, ?) ON CONFLICT (role) DO NOTHING`,
+          [role, canPost, canComment, canStory, canAnnounce],
+        );
+      }
+    }
   }
 
   private async runBootstrapMigrations(): Promise<void> {
@@ -690,6 +765,7 @@ class DatabaseManager {
         await this.query(queryToRun);
       }
     }
+    await this.runSocialMigrations();
     console.log('✅ [DB] System bootstrap completed successfully.');
   }
 
@@ -708,7 +784,20 @@ class DatabaseManager {
 
       this.sqliteDatabase.run(normalizedSql, params);
       if (this.sqliteFilePath) {
-        fs.writeFileSync(this.sqliteFilePath, Buffer.from(this.sqliteDatabase.export()));
+        const data = Buffer.from(this.sqliteDatabase.export());
+        const tempPath = `${this.sqliteFilePath}.tmp`;
+        fs.writeFileSync(tempPath, data);
+        let copied = false;
+        for (let attempt = 0; attempt < 3 && !copied; attempt += 1) {
+          try {
+            fs.copyFileSync(tempPath, this.sqliteFilePath, fs.constants.COPYFILE_FICLONE);
+            copied = true;
+          } catch {
+            if (attempt === 2) throw new Error('Unable to persist SQLite changes because the database file is locked.');
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+          }
+        }
+        fs.rmSync(tempPath, { force: true });
       }
       return { rows: [], affectedRows: this.sqliteDatabase.getRowsModified() };
     }

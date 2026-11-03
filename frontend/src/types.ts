@@ -46,6 +46,8 @@ export interface User {
 
 export interface Student {
   id: string;
+  name?: string;
+  admissionNo?: string;
   classId?: string;
   rollNo: string;
   firstName: string;
@@ -251,6 +253,7 @@ export interface Announcement {
 
 export interface AdmissionApplication {
   id: string;
+  applicationNumber?: string;
   applicantName: string;
   gender: 'M' | 'F';
   dob: string;

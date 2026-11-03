@@ -109,6 +109,16 @@ export async function recordPayment(req: AuthRequest, res: Response) {
       ? referenceNo.trim()
       : `SSP-${Date.now()}`;
 
+    if (typeof referenceNo === 'string' && referenceNo.trim()) {
+      const duplicateRef = await db.query(
+        `SELECT id FROM payments WHERE reference_no = ? AND status IN ('Completed', 'Pending Verification') LIMIT 1`,
+        [ref],
+      );
+      if (duplicateRef.rows.length > 0) {
+        return res.status(409).json({ error: 'A payment with this reference number already exists.' });
+      }
+    }
+
     await db.query(
       `INSERT INTO payments (id, fee_id, student_id, amount, payment_method, reference_no, phone_number, status, recorded_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'Completed', ?)`,

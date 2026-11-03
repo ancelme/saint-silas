@@ -79,6 +79,22 @@ async function saveContent(
   res: Response,
 ) {
   try {
+    if (contentKey === 'timetable') {
+      const slots = items as TimetableSlot[];
+      const teacherConflicts = new Map<string, TimetableSlot>();
+      const classroomConflicts = new Map<string, TimetableSlot>();
+      for (const slot of slots) {
+        const teacherKey = `${slot.day}|${slot.period}|${slot.teacherName.trim().toLowerCase()}`;
+        const classroomKey = `${slot.day}|${slot.period}|${slot.classroom.trim().toLowerCase()}`;
+        if (teacherConflicts.has(teacherKey) || classroomConflicts.has(classroomKey)) {
+          return res.status(409).json({
+            error: `Scheduling conflict on ${slot.day} at ${slot.period} for teacher or classroom "${slot.teacherName}" / "${slot.classroom}".`,
+          });
+        }
+        teacherConflicts.set(teacherKey, slot);
+        classroomConflicts.set(classroomKey, slot);
+      }
+    }
     const serialized = JSON.stringify(items);
     const existing = await db.query(
       'SELECT content_key FROM school_content WHERE content_key = ?',

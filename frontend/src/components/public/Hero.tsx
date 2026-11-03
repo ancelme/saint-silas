@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { useLanguage } from '../../context/LanguageContext';
 import {
   ArrowRight,
@@ -61,7 +62,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenAuth, onOpenMap }) => {
   }, []);
 
   return (
-    <section id="home" className="relative overflow-hidden pt-6 pb-16 lg:pt-10 lg:pb-24 bg-gradient-to-b from-sky-500/5 via-amber-500/5 to-emerald-500/5">
+    <section id="home" className="public-hero relative overflow-hidden pt-6 pb-16 lg:pt-10 lg:pb-24 bg-gradient-to-b from-sky-500/5 via-amber-500/5 to-emerald-500/5">
       {/* Rwandan National Palette Accent Ribbon */}
       <div className="h-1.5 w-full bg-gradient-to-r from-sky-500 via-amber-400 to-emerald-600 mb-6 shadow-xs" />
 
@@ -94,7 +95,12 @@ export const Hero: React.FC<HeroProps> = ({ onOpenAuth, onOpenMap }) => {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
           {/* Left Column: High-Design Copy, Value Proposition, & CTAs */}
-          <div className="lg:col-span-7 space-y-6">
+          <motion.div
+            initial={{ opacity: 0, x: -28 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className="lg:col-span-7 space-y-6"
+          >
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
               <span className="text-amber-700 dark:text-amber-400 font-bold">
                 {t('schoolType')}
@@ -135,7 +141,9 @@ export const Hero: React.FC<HeroProps> = ({ onOpenAuth, onOpenMap }) => {
 
             {/* Action Buttons */}
             <div className="pt-2 flex flex-wrap items-center gap-3.5">
-              <button
+              <motion.button
+                whileHover={{ y: -2, scale: 1.015 }}
+                whileTap={{ scale: 0.98 }}
                 type="button"
                 id="hero-portal-btn"
                 onClick={() => onOpenAuth('login')}
@@ -143,7 +151,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenAuth, onOpenMap }) => {
               >
                 <span>{t('btnExplorePortal')}</span>
                 <ArrowRight className="w-4 h-4" />
-              </button>
+              </motion.button>
 
               <a
                 href="#national-success"
@@ -162,7 +170,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenAuth, onOpenMap }) => {
             </div>
 
             {/* Three Division Cards */}
-            <div className="pt-2 grid grid-cols-3 gap-3 text-center">
+            <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
               <div className="p-3.5 rounded-2xl bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-amber-500/50 transition-colors">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block">
                   {t('heroNurseryBadge')}
@@ -215,15 +223,20 @@ export const Hero: React.FC<HeroProps> = ({ onOpenAuth, onOpenMap }) => {
                 <span>{t('trustCulture')}</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Right Column: Hero Visual Asset with Floating National Distinction Overlays */}
-          <div className="lg:col-span-5 relative">
-            <div className="relative rounded-3xl overflow-hidden border-2 border-emerald-600/30 bg-white dark:bg-slate-900 shadow-2xl shadow-emerald-950/20 group">
+          <motion.div
+            initial={{ opacity: 0, x: 28, scale: 0.97 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={{ duration: 0.75, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+            className="lg:col-span-5 relative"
+          >
+            <div className="hero-image-shell relative rounded-[2rem] overflow-hidden border border-white/70 bg-white dark:bg-slate-900 shadow-[0_32px_80px_-28px_rgba(5,150,105,0.55)] group">
               <img
                 src={settings.home_hero_image || heroImage}
                 alt="Joyful Rwandan primary school pupils at St. Silas EAR Kibondo in Gatsibo"
-                className="w-full h-84 sm:h-[430px] object-cover group-hover:scale-[1.02] transition-transform duration-500"
+                className="w-full h-[360px] sm:h-[430px] object-cover group-hover:scale-[1.035] transition-transform duration-700 ease-out"
                 referrerPolicy="no-referrer"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/25 to-transparent" />
@@ -252,7 +265,11 @@ export const Hero: React.FC<HeroProps> = ({ onOpenAuth, onOpenMap }) => {
             </div>
 
             {/* National PLE 100% Top Floating Card */}
-            <div className="absolute -top-4 -left-4 hidden sm:flex items-center gap-3 p-3.5 rounded-2xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border border-amber-300 dark:border-amber-700/70 shadow-xl">
+            <motion.div
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 4.8, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute -top-4 -left-4 hidden sm:flex items-center gap-3 p-3.5 rounded-2xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border border-amber-300 dark:border-amber-700/70 shadow-xl"
+            >
               <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center justify-center font-bold">
                 <Award className="w-5 h-5" />
               </div>
@@ -264,7 +281,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenAuth, onOpenMap }) => {
                   100% Pass Rate
                 </span>
               </div>
-            </div>
+            </motion.div>
 
             {/* Gatsibo District Academic Ranking Bottom Right Card */}
             <div className="absolute -bottom-3 -right-3 hidden sm:flex items-center gap-3 p-3.5 rounded-2xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border border-emerald-300 dark:border-emerald-700/70 shadow-xl">
@@ -280,7 +297,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenAuth, onOpenMap }) => {
                 </span>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
 
         {/* Animated Statistics Counter Grid */}

@@ -23,12 +23,13 @@ const TOKEN_KEY = 'st_silas_auth_token';
 export interface ChatContact {
   id: string;
   fullName: string;
-  role: Role;
+  role: Role | 'group';
   avatar: string;
   lastMessage: string;
   unreadCount: number;
   isOnline: boolean;
   lastSeen: string | null;
+  isGroup?: boolean;
 }
 
 export interface DirectMessage {
@@ -142,6 +143,64 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return response.json();
 }
 
+export interface SocialStory {
+  id: string;
+  user_id: string;
+  author_name: string;
+  author_role: string;
+  author_avatar?: string;
+  media_url?: string;
+  media_type: string;
+  content?: string;
+  caption?: string;
+  background?: string;
+  created_at: string;
+}
+
+export interface SocialPost {
+  id: string;
+  user_id: string;
+  author_name: string;
+  author_role: string;
+  author_avatar?: string;
+  content?: string;
+  audience?: string;
+  is_announcement?: number;
+  announcement_type?: string;
+  created_at: string;
+  media: Array<{ id: string; media_type: string; url: string; file_name?: string }>;
+  likes: string[];
+  comments: Array<{ id: string; user_id: string; author_name: string; content: string }>;
+}
+
+export function fetchSocialFeed() {
+  return request<{ stories: SocialStory[]; posts: SocialPost[] }>('/api/social/feed');
+}
+
+export function createSocialStory(payload: {
+  content?: string; mediaUrl?: string; mediaType?: string; caption?: string;
+  background?: string; privacy?: string;
+}) {
+  return request('/api/social/stories', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function createSocialPost(payload: {
+  content?: string; audience?: string; isAnnouncement?: boolean;
+  announcementType?: string; media?: Array<{ type: string; url: string; name?: string }>;
+}) {
+  return request('/api/social/posts', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function toggleSocialPostLike(postId: string) {
+  return request<{ liked: boolean }>(`/api/social/posts/${postId}/like`, { method: 'POST' });
+}
+
+export function commentOnSocialPost(postId: string, content: string) {
+  return request(`/api/social/posts/${postId}/comments`, {
+    method: 'POST', body: JSON.stringify({ content }),
+  });
+}
+
 // ==========================================
 // 1. Setup & System Initialization
 // ==========================================
@@ -206,6 +265,13 @@ export async function completeFirstLogin(payload: {
 
 export async function fetchChatContacts() {
   return request<ChatContact[]>('/api/messages/contacts');
+}
+
+export function createChatGroup(payload: { name: string; description?: string; memberIds: string[] }) {
+  return request<{ id: string; name: string }>('/api/messages/groups', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function fetchFeedbackInbox() {

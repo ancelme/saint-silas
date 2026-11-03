@@ -16,6 +16,9 @@ const PRIVILEGED_ROLES = ['owner', 'super_admin', 'admin', 'head_teacher', 'teac
 
 export async function registerApplicant(req: Request, res: Response) {
   try {
+    return res.status(403).json({
+      error: 'Public registration is disabled. School accounts must be created by the Super Admin.'
+    });
     const { fullName, email, username, password } = req.body;
     const cleanFullName = typeof fullName === 'string' ? fullName.trim() : '';
     const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';

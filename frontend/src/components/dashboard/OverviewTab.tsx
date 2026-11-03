@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import confetti from 'canvas-confetti';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { ShareDocumentButton } from '../common/ShareDocumentButton';
@@ -72,17 +71,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
   const [selectedChildId, setSelectedChildId] = useState('');
 
-  // Teacher State: Quick Roll Call for P5 Alpha
-  const [p5Attendance, setP5Attendance] = useState<Record<string, 'Present' | 'Late' | 'Absent'>>({
-    'Keza Aline': 'Present',
-    'Gasana Mugisha': 'Present',
-    'Ineza Grace': 'Present',
-    'Manzi Thierry': 'Late',
-    'Ishimwe Samuel': 'Present',
-    'Umutoni Cynthia': 'Present',
-  });
-  const [rollCallSaved, setRollCallSaved] = useState(false);
-
   // Student State: Star card modal
   const [showReportCardModal, setShowReportCardModal] = useState(false);
   const [expandedChart, setExpandedChart] = useState<'enrollment' | 'fees' | null>(null);
@@ -117,7 +105,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const feePercent = totalBilled > 0 ? Math.round((totalPaid / totalBilled) * 100) : 0;
 
   const presentCount = attendance.filter(a => a.status === 'Present').length;
-  const attendanceRate = attendance.length > 0 ? Math.round((presentCount / attendance.length) * 100) : 98;
+  const attendanceRate = attendance.length > 0 ? Math.round((presentCount / attendance.length) * 100) : 0;
   const chartData = {
     enrollment: [
       { label: 'Nursery', value: nurseryCount, color: 'bg-violet-500' },
@@ -157,23 +145,14 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
     );
   };
 
-  const handleSaveRollCall = () => {
-    setRollCallSaved(true);
-    confetti({
-      particleCount: 70,
-      spread: 60,
-      origin: { y: 0.7 }
-    });
-    setTimeout(() => setRollCallSaved(false), 4000);
-  };
-
   return (
     <div className="space-y-6">
       {/* Rwandan Primary School Banner */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 p-6 sm:p-8 text-white shadow-xl"
+        transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+        className="dashboard-hero relative overflow-hidden rounded-[30px] bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 p-6 sm:p-8 text-white shadow-[0_24px_60px_-30px_rgba(5,150,105,0.85)]"
       >
         <div className="relative z-10 max-w-3xl space-y-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -324,9 +303,37 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           animate={{ opacity: 1 }}
           className="space-y-6"
         >
+          <div className="relative overflow-hidden rounded-[28px] border border-emerald-100 bg-gradient-to-r from-white via-white to-emerald-50/70 dark:border-emerald-900/40 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-950/30 px-5 py-4 shadow-sm">
+            <div className="absolute inset-y-0 right-0 w-44 opacity-40 bg-[radial-gradient(circle_at_center,rgba(16,185,129,.18),transparent_65%)]" />
+            <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,.12)] animate-pulse" />
+                  Executive pulse
+                </div>
+                <h3 className="mt-1 text-lg font-black text-slate-900 dark:text-white">School operations at a glance</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:min-w-[520px]">
+                <div className="rounded-2xl bg-white/80 dark:bg-slate-950/50 px-4 py-3 border border-slate-100 dark:border-slate-800">
+                  <p className="text-[10px] font-bold uppercase text-slate-400">Attendance</p>
+                  <p className="mt-1 text-xl font-black text-slate-900 dark:text-white">{attendanceRate}%</p>
+                </div>
+                <div className="rounded-2xl bg-white/80 dark:bg-slate-950/50 px-4 py-3 border border-slate-100 dark:border-slate-800">
+                  <p className="text-[10px] font-bold uppercase text-slate-400">Outstanding</p>
+                  <p className="mt-1 truncate text-sm font-black text-slate-900 dark:text-white">{formatRWF(totalBalance)}</p>
+                </div>
+                <div className="col-span-2 rounded-2xl bg-emerald-600 px-4 py-3 text-white shadow-lg shadow-emerald-600/20 sm:col-span-1">
+                  <p className="text-[10px] font-bold uppercase text-emerald-100">Collection</p>
+                  <p className="mt-1 text-xl font-black">{feePercent}%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Owner Executive KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs">
+            <div className="group relative overflow-hidden p-5 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all">
+              <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-emerald-100/60 dark:bg-emerald-900/20" />
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-bold text-slate-500 uppercase">Enrolled Students</span>
                 <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400 flex items-center justify-center">
@@ -334,12 +341,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 </div>
               </div>
               <p className="text-2xl font-black text-slate-900 dark:text-white">{enrolledCount} Pupils</p>
-              <p className="text-[11px] text-emerald-700 font-semibold mt-1">
+              <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold mt-1">
                 {nurseryCount} Nursery • {lowerCount} Lower • {upperCount} Upper
               </p>
             </div>
 
-            <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs">
+            <div className="group relative overflow-hidden p-5 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all">
+              <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-sky-100/60 dark:bg-sky-900/20" />
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-bold text-slate-500 uppercase">Faculty Educators</span>
                 <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400 flex items-center justify-center">
@@ -347,10 +355,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 </div>
               </div>
               <p className="text-2xl font-black text-slate-900 dark:text-white">{teachers.length} Teachers</p>
-              <p className="text-[11px] text-sky-700 font-semibold mt-1">Active CBC Certified Educators</p>
+              <p className="text-[11px] text-sky-700 dark:text-sky-400 font-semibold mt-1">School faculty directory</p>
             </div>
 
-            <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs">
+            <div className="group relative overflow-hidden p-5 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all">
+              <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-amber-100/60 dark:bg-amber-900/20" />
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-bold text-slate-500 uppercase">Total Revenue Paid</span>
                 <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400 flex items-center justify-center">
@@ -361,15 +370,16 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               <p className="text-[11px] text-amber-600 font-semibold mt-1">{feePercent}% collection rate</p>
             </div>
 
-            <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs">
+            <div className="group relative overflow-hidden p-5 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all">
+              <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-violet-100/60 dark:bg-violet-900/20" />
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-bold text-slate-500 uppercase">Database & Security</span>
                 <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400 flex items-center justify-center">
                   <Database className="w-5 h-5" />
                 </div>
               </div>
-              <p className="text-2xl font-black text-slate-900 dark:text-white">Active SQL</p>
-              <p className="text-[11px] text-purple-600 font-semibold mt-1">Full backup & restore enabled</p>
+              <p className="text-2xl font-black text-slate-900 dark:text-white">Database Live</p>
+              <p className="text-[11px] text-purple-600 dark:text-purple-400 font-semibold mt-1">Persistent school records</p>
             </div>
           </div>
 
@@ -627,89 +637,26 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             </div>
           </div>
 
-          {/* Interactive Class Roll-Call for Mwalimu */}
-          <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-700">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <CalendarCheck2 className="w-5 h-5 text-emerald-600" />
-                  <span>Primary 5 Alpha - Today Roll-Call Attendance</span>
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Quickly mark pupil attendance for morning session in Kibondo campus
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <ShareDocumentButton
-                  title="Official Term Report Card"
-                  text="St. Silas Primary School official term report card."
-                  className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const allP: Record<string, 'Present' | 'Late' | 'Absent'> = {};
-                    Object.keys(p5Attendance).forEach(k => { allP[k] = 'Present'; });
-                    setP5Attendance(allP);
-                  }}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 cursor-pointer"
-                >
-                  Mark All Present
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveRollCall}
-                  className="px-4 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer"
-                >
-                  Save Roll-Call
-                </button>
-              </div>
-            </div>
-
-            {rollCallSaved && (
-              <motion.div
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2"
-              >
-                <Check className="w-4 h-4" />
-                <span>Murakoze! Morning roll-call attendance for Primary 5 Alpha saved and transmitted to Head Teacher.</span>
-              </motion.div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {Object.entries(p5Attendance).map(([pupilName, status]) => (
-                <div
-                  key={pupilName}
-                  className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between"
-                >
-                  <div>
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{pupilName}</p>
-                    <span className="text-[10px] text-slate-400">P5 Alpha</span>
-                  </div>
-                  <div className="flex gap-1">
-                    {(['Present', 'Late', 'Absent'] as const).map(st => (
-                      <button
-                        key={st}
-                        type="button"
-                        onClick={() => setP5Attendance({ ...p5Attendance, [pupilName]: st })}
-                        className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                          status === st
-                            ? st === 'Present'
-                              ? 'bg-emerald-600 text-white'
-                              : st === 'Late'
-                              ? 'bg-amber-500 text-white'
-                              : 'bg-rose-500 text-white'
-                            : 'bg-white dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
-                        }`}
-                      >
-                        {st.charAt(0)}
-                      </button>
-                    ))}
-                  </div>
+          <div className="p-5 sm:p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300">
+                  <CalendarCheck2 className="w-5 h-5" />
                 </div>
-              ))}
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">Daily Attendance</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                    Record attendance through the official database-backed attendance register.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigateTab('attendance')}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20 transition-colors cursor-pointer"
+              >
+                Open Attendance Register
+              </button>
             </div>
           </div>
         </motion.div>

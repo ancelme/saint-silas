@@ -98,6 +98,7 @@ import {
   deleteDirectMessage,
   getMessagePrivacy,
   updateMessagePrivacy,
+  createChatGroup,
 } from '../controllers/messagesController';
 import {
   getDashboardInsights,
@@ -116,6 +117,11 @@ import {
   saveTimetable,
 } from '../controllers/schoolContentController';
 import { authenticateToken, requireRole, requireOwnerOnly, requireAccountCreator } from '../middleware/auth';
+import {
+  getSocialFeed, createStory, deleteStory, viewStory, reactToStory,
+  createPost, updatePost, deletePost, togglePostLike, addPostComment,
+} from '../controllers/socialController';
+import { getSocialPermissions, updateSocialPermission } from '../controllers/socialPermissionsController';
 
 const router = Router();
 
@@ -141,11 +147,25 @@ router.put('/events', authenticateToken, requireRole('admin', 'head_teacher'), s
 router.get('/messages/privacy', authenticateToken, getMessagePrivacy);
 router.put('/messages/privacy', authenticateToken, updateMessagePrivacy);
 router.get('/messages/contacts', authenticateToken, getMessageContacts);
+router.post('/messages/groups', authenticateToken, createChatGroup);
 router.get('/messages/feedback/inbox', authenticateToken, requireRole('admin'), getFeedbackInbox);
 router.put('/messages/feedback/:id/read', authenticateToken, requireRole('admin'), markFeedbackRequestRead);
 router.get('/messages/:userId', authenticateToken, getConversation);
 router.post('/messages/:userId', authenticateToken, sendDirectMessage);
 router.delete('/messages/:id', authenticateToken, deleteDirectMessage);
+
+router.get('/social/feed', authenticateToken, getSocialFeed);
+router.post('/social/stories', authenticateToken, createStory);
+router.delete('/social/stories/:id', authenticateToken, deleteStory);
+router.post('/social/stories/:id/view', authenticateToken, viewStory);
+router.post('/social/stories/:id/react', authenticateToken, reactToStory);
+router.post('/social/posts', authenticateToken, createPost);
+router.put('/social/posts/:id', authenticateToken, updatePost);
+router.delete('/social/posts/:id', authenticateToken, deletePost);
+router.post('/social/posts/:id/like', authenticateToken, togglePostLike);
+router.post('/social/posts/:id/comments', authenticateToken, addPostComment);
+router.get('/social/permissions', authenticateToken, requireRole('owner', 'super_admin'), getSocialPermissions);
+router.put('/social/permissions/:role', authenticateToken, requireRole('owner', 'super_admin'), updateSocialPermission);
 
 // ==========================================
 // 2. User & Staff Management (Administrator & Super Admin / Owner)

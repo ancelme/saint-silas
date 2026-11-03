@@ -42,7 +42,11 @@ import {
   CheckCircle2,
   ShieldCheck,
   Settings,
-  PackageOpen
+  PackageOpen,
+  Search,
+  Clock3,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
 
 import { OverviewTab } from './OverviewTab';
@@ -164,6 +168,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [lastDashboardTab, setLastDashboardTab] = useState('overview');
   const [chatContactToOpen, setChatContactToOpen] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [dashboardSearch, setDashboardSearch] = useState('');
+  const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<AccountNotification[]>([]);
@@ -177,6 +184,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [auditLogs, setAuditLogs] = useState<UserAuditLog[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentDateTime(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const currentRole = (user?.role || 'student') as Role;
   const canViewFeedbackInbox = ['owner', 'super_admin', 'admin'].includes(currentRole);
@@ -280,7 +292,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   // Define Navigation Items with Role-based filtering
   const allNavItems = [
     { id: 'overview', label: t('dashOverview'), icon: LayoutDashboard, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'accountant', 'teacher', 'librarian', 'student', 'parent'] },
-    { id: 'users', label: 'User & Role Mgmt', icon: Users, roles: ['owner', 'super_admin', 'admin'] },
+    { id: 'users', label: 'User & Role Mgmt', icon: Users, roles: ['owner', 'super_admin'] },
     { id: 'admissions', label: t('dashAdmissions'), icon: FileText, roles: ['owner', 'super_admin', 'admin', 'head_teacher'] },
     { id: 'students', label: t('dashStudents'), icon: GraduationCap, roles: ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher', 'parent'] },
     { id: 'teachers', label: t('dashTeachers'), icon: BookOpen, roles: ['owner', 'super_admin', 'admin', 'head_teacher'] },
@@ -383,7 +395,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       )}
 
       {/* Top Navbar */}
-      <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 h-16 flex items-center px-4 sm:px-6">
+      <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/80 h-[68px] flex items-center px-4 sm:px-6 shadow-[0_1px_20px_rgba(15,23,42,0.04)]">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -395,7 +407,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
           {/* School Brand */}
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 text-white flex items-center justify-center font-black text-sm shadow-lg shadow-emerald-600/20 ring-4 ring-emerald-50 dark:ring-emerald-950/40">
               SS
             </div>
             <div>
@@ -407,10 +419,46 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               </span>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => setIsSidebarCollapsed(value => !value)}
+            className="hidden lg:inline-flex ml-2 p-2 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+          </button>
         </div>
 
         {/* Right Header Controls */}
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
+          <div className="relative hidden xl:block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              value={dashboardSearch}
+              onChange={event => setDashboardSearch(event.target.value)}
+              onKeyDown={event => {
+                if (event.key !== 'Enter') return;
+                const match = visibleNavItems.find(item => item.label.toLowerCase().includes(dashboardSearch.trim().toLowerCase()));
+                if (match) {
+                  handleTabSelect(match.id);
+                  setDashboardSearch('');
+                }
+              }}
+              placeholder="Search navigation..."
+              className="h-9 w-52 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900 pl-9 pr-3 text-xs font-semibold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+            />
+          </div>
+          <div className="hidden 2xl:flex items-center gap-2 rounded-xl bg-slate-50 dark:bg-slate-900 px-3 py-2 border border-slate-100 dark:border-slate-800">
+            <Clock3 className="w-4 h-4 text-emerald-600" />
+            <div className="leading-tight">
+              <div className="text-[10px] font-black text-slate-700 dark:text-slate-200 tabular-nums">
+                {currentDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </div>
+              <div className="text-[9px] text-slate-400">
+                {currentDateTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+              </div>
+            </div>
+          </div>
           {/* User Role Badge */}
           <span className={`hidden sm:inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${roleBadges[currentRole]?.color || 'bg-slate-100 text-slate-800'}`}>
             {roleBadges[currentRole]?.label || currentRole}
@@ -564,13 +612,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <aside
-          className={`fixed lg:static inset-y-0 left-0 z-25 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-transform duration-200 lg:translate-x-0 ${
+          className={`fixed lg:static inset-y-0 left-0 z-25 ${isSidebarCollapsed ? 'lg:w-20' : 'lg:w-64'} w-64 bg-white/95 dark:bg-slate-950/95 border-r border-slate-200/80 dark:border-slate-800/80 flex flex-col backdrop-blur-xl shadow-2xl shadow-slate-950/5 lg:shadow-none transition-all duration-300 lg:translate-x-0 ${
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
           {/* Navigation Links */}
           <div className="p-4 space-y-1 overflow-y-auto flex-1">
-            <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <div className={`px-3 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 ${isSidebarCollapsed ? 'lg:text-center lg:px-0' : ''}`}>
               {t('portalTitle')}
             </div>
             {visibleNavItems.map(item => {
@@ -581,14 +629,15 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   key={item.id}
                   type="button"
                   onClick={() => handleTabSelect(item.id)}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+                  title={isSidebarCollapsed ? item.label : undefined}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${isSidebarCollapsed ? 'lg:justify-center lg:px-2' : ''} ${
                     isActive
-                      ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/30'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/20'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-emerald-50 dark:hover:bg-slate-800 hover:text-emerald-800 dark:hover:text-white'
                   }`}
                 >
                   <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                  <span>{item.label}</span>
+                  <span className={isSidebarCollapsed ? 'lg:hidden' : ''}>{item.label}</span>
                   {(navigationBadgeCounts[item.id] || 0) > 0 && (
                     <span
                       key={`${item.id}-${navigationBadgeCounts[item.id]}`}
@@ -608,7 +657,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           </div>
 
           {/* Bottom Sidebar User Info & Avatar Upload trigger */}
-          <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-2">
+          <div className={`p-4 border-t border-slate-200 dark:border-slate-800 space-y-2 ${isSidebarCollapsed ? 'lg:px-2' : ''}`}>
             <div
               onClick={triggerAvatarUpload}
               className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750 flex items-center gap-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
@@ -625,7 +674,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   <Camera className="w-3.5 h-3.5 text-white" />
                 </div>
               </div>
-              <div className="overflow-hidden">
+              <div className={`overflow-hidden ${isSidebarCollapsed ? 'lg:hidden' : ''}`}>
                 <span className="text-xs font-bold text-slate-900 dark:text-white block truncate">
                   {user?.fullName || user?.name}
                 </span>
@@ -638,10 +687,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             <button
               type="button"
               onClick={onSwitchToPublic}
+              title={isSidebarCollapsed ? 'Back to Public Site' : undefined}
               className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              <span>Back to Public Site</span>
+              <span className={isSidebarCollapsed ? 'lg:hidden' : ''}>Back to Public Site</span>
             </button>
           </div>
         </aside>
@@ -655,7 +705,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         )}
 
         {/* Content View Area */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+        <main className="dashboard-content flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 xl:p-10 max-w-[1500px] mx-auto w-full">
           {activeTab === 'overview' && (
             currentRole === 'librarian'
               ? <LibraryTab managementMode dashboardView />

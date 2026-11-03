@@ -174,9 +174,9 @@ export function requireAccountCreator(req: AuthRequest, res: Response, next: Nex
     return res.status(401).json({ error: 'Unauthenticated' });
   }
 
-  if (req.user.role !== 'owner' && req.user.role !== 'admin') {
+  if (req.user.role !== 'owner' && req.user.role !== 'super_admin') {
     return res.status(403).json({
-      error: 'Forbidden: Only the School Owner or an Administrator can create and manage school users.'
+      error: 'Forbidden: Only the Super Admin / School Owner can create and manage school users.'
     });
   }
 

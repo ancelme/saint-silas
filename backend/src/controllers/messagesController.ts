@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import crypto from 'crypto';
 import { db } from '../db/index';
 import { AuthRequest, recordAuditLog } from '../middleware/auth';
 import { broadcastUserPresence, publishDirectMessage, publishMessageDeletion } from '../socket/chatSocket';
@@ -86,7 +87,7 @@ export async function getMessageContacts(req: AuthRequest, res: Response) {
       [userId, userId, userId, userId, req.user!.role],
     );
 
-    return res.json(result.rows.map(contact => ({
+    const directContacts = result.rows.map(contact => ({
       id: contact.id,
       fullName: contact.full_name,
       role: contact.role,
@@ -95,16 +96,95 @@ export async function getMessageContacts(req: AuthRequest, res: Response) {
       unreadCount: Number(contact.unread_count || 0),
       isOnline: Number(contact.is_online) === 1,
       lastSeen: Number(contact.show_last_seen ?? 1) === 1 ? contact.last_seen_at || null : null,
-    })));
+    }));
+    const groups = await db.query(
+      `SELECT g.id, g.name, g.avatar_url,
+              (SELECT m.body FROM chat_group_messages m WHERE m.group_id = g.id ORDER BY m.created_at DESC LIMIT 1) AS last_message
+       FROM chat_groups g
+       JOIN chat_group_members gm ON gm.group_id = g.id
+       WHERE gm.user_id = ? ORDER BY g.created_at DESC`,
+      [userId],
+    );
+    return res.json([
+      ...groups.rows.map(group => ({
+        id: `group:${group.id}`,
+        fullName: group.name,
+        role: 'group',
+        avatar: group.avatar_url || '',
+        lastMessage: group.last_message ? getChatMessagePreview(group.last_message) : 'Group conversation',
+        unreadCount: 0,
+        isOnline: true,
+        lastSeen: null,
+        isGroup: true,
+      })),
+      ...directContacts,
+    ]);
   } catch (error) {
     console.error('Error retrieving chat contacts:', error);
     return res.status(500).json({ error: 'Failed to retrieve chat contacts' });
   }
 }
 
+export async function createChatGroup(req: AuthRequest, res: Response) {
+    const name = String(req.body?.name || '').trim();
+    const memberIds = Array.isArray(req.body?.memberIds)
+      ? [...new Set(req.body.memberIds.filter((value: unknown) => typeof value === 'string'))] as string[]
+      : [];
+    if (!name || name.length > 150) return res.status(400).json({ error: 'Group name must contain 1 to 150 characters.' });
+
+    const groupId = crypto.randomUUID();
+    await db.query(
+      'INSERT INTO chat_groups (id, name, description, created_by) VALUES (?, ?, ?, ?)',
+      [groupId, name, String(req.body?.description || '').trim(), req.user!.id],
+    );
+    await db.query(
+      "INSERT INTO chat_group_members (group_id, user_id, role) VALUES (?, ?, 'admin')",
+      [groupId, req.user!.id],
+    );
+    for (const memberId of memberIds) {
+      if (memberId === req.user!.id) continue;
+      const member = await db.query('SELECT id FROM users WHERE id = ? AND COALESCE(is_active, 1) = 1 LIMIT 1', [memberId]);
+      if (member.rows.length) {
+        await db.query(
+          "INSERT INTO chat_group_members (group_id, user_id, role) VALUES (?, ?, 'member')",
+          [groupId, memberId],
+        );
+      }
+    }
+    return res.status(201).json({ id: groupId, name });
+}
+
 export async function getConversation(req: AuthRequest, res: Response) {
   const currentUserId = req.user!.id;
   const otherUserId = req.params.userId;
+
+  if (otherUserId.startsWith('group:')) {
+    const groupId = otherUserId.slice(6);
+    const membership = await db.query(
+      'SELECT 1 FROM chat_group_members WHERE group_id = ? AND user_id = ? LIMIT 1',
+      [groupId, currentUserId],
+    );
+    if (!membership.rows.length) return res.status(403).json({ error: 'You are not a member of this group.' });
+    const messages = await db.query(
+      `SELECT gm.id, gm.sender_id, gm.body, gm.attachments, gm.created_at, u.full_name AS sender_name
+       FROM chat_group_messages gm JOIN users u ON u.id = gm.sender_id
+       WHERE gm.group_id = ? ORDER BY gm.created_at ASC LIMIT 200`,
+      [groupId],
+    );
+    return res.json(messages.rows.map(message => ({
+      id: message.id,
+      senderId: message.sender_id,
+      senderName: message.sender_name,
+      recipientId: otherUserId,
+      subject: '',
+      body: decodeChatMessage(message.body || '').body,
+      attachments: decodeChatMessage(message.body || '').attachments,
+      deliveryStatus: 'read',
+      deliveredAt: message.created_at,
+      readAt: message.created_at,
+      createdAt: message.created_at,
+    })));
+  }
 
   if (!otherUserId || otherUserId === currentUserId) {
     return res.status(400).json({ error: 'Choose a different user to start a conversation' });
@@ -167,6 +247,31 @@ export async function sendDirectMessage(req: AuthRequest, res: Response) {
   const body = req.body?.body;
   const requestedSubject = req.body?.subject;
   const attachments = req.body?.attachments;
+
+  if (recipientId.startsWith('group:')) {
+    const groupId = recipientId.slice(6);
+    const membership = await db.query(
+      'SELECT 1 FROM chat_group_members WHERE group_id = ? AND user_id = ? LIMIT 1',
+      [groupId, senderId],
+    );
+    if (!membership.rows.length) return res.status(403).json({ error: 'You are not a member of this group.' });
+    if (typeof body !== 'string' || (!body.trim() && !Array.isArray(attachments))) {
+      return res.status(400).json({ error: 'Message must contain text or an attachment.' });
+    }
+    const messageId = crypto.randomUUID();
+    await db.query(
+      'INSERT INTO chat_group_messages (id, group_id, sender_id, body, attachments) VALUES (?, ?, ?, ?, ?)',
+      [messageId, groupId, senderId, encodeChatMessage(String(body || ''), Array.isArray(attachments) ? attachments : []), JSON.stringify(Array.isArray(attachments) ? attachments : [])],
+    );
+    return res.status(201).json({
+      message: {
+        id: messageId, senderId, recipientId, subject: '', body: String(body || ''),
+        attachments: Array.isArray(attachments) ? attachments : [],
+        deliveryStatus: 'read', deliveredAt: new Date().toISOString(), readAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      },
+    });
+  }
 
   if (!recipientId || recipientId === senderId) {
     return res.status(400).json({ error: 'Choose a different user to receive this message' });

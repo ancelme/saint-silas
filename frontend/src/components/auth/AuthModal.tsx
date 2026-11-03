@@ -240,7 +240,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => { setTab('signup'); setErrorMsg(''); }}
+                disabled
                 className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
                   tab === 'signup' ? 'bg-white text-slate-900 shadow-sm' : 'text-white/80 hover:text-white'
                 }`}

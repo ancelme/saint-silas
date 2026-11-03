@@ -8,7 +8,6 @@ import {
   borrowBook, createLibraryBook, deleteLibraryBook, fetchBorrowingRecords,
   fetchLibraryBooks, fetchStudents, returnBook
 } from '../../services/api';
-import { INITIAL_BOOKS } from '../../data/mockData';
 
 interface LibraryTabProps {
   managementMode?: boolean;
@@ -49,7 +48,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false, 
   const [showBookModal, setShowBookModal] = useState(false);
   const [showBorrowModal, setShowBorrowModal] = useState(false);
   const [showMemberModal, setShowMemberModal] = useState(false);
-  const [bookForm, setBookForm] = useState({ isbn: '', title: '', author: '', category: 'Textbook', targetLevel: 'All', totalCopies: 1, location: 'Main Shelf' });
+  const [bookForm, setBookForm] = useState<{ isbn: string; title: string; author: string; category: string; targetLevel: LibraryBook['targetLevel']; totalCopies: number; location: string }>({ isbn: '', title: '', author: '', category: 'Textbook', targetLevel: 'All', totalCopies: 1, location: 'Main Shelf' });
   const [borrowForm, setBorrowForm] = useState({ bookId: '', borrowerName: '', borrowerType: 'Student' as 'Student' | 'Teacher' | 'Staff', days: 14 });
   const [memberForm, setMemberForm] = useState({ name: '', registrationNo: '', type: 'Student', grade: '' });
 
@@ -60,11 +59,11 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false, 
       const [bookData, borrowingData, studentData] = await Promise.all([
         fetchLibraryBooks(), fetchBorrowingRecords(), fetchStudents()
       ]);
-      setBooks(bookData.length ? bookData : INITIAL_BOOKS);
+      setBooks(bookData);
       setBorrowings(borrowingData);
       setStudents(studentData);
     } catch (requestError) {
-      setBooks(INITIAL_BOOKS);
+      setBooks([]);
       setError(requestError instanceof Error ? requestError.message : 'Library data could not be loaded.');
     } finally {
       setLoading(false);
@@ -86,7 +85,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false, 
     setMembers(current => {
       const studentMembers = students.map(student => ({
         id: student.id,
-        name: student.name,
+        name: student.name || `${student.firstName} ${student.lastName}`.trim(),
         registrationNo: String(student.admissionNo || student.id).toUpperCase(),
         type: 'Student',
         grade: student.grade || '',
@@ -191,7 +190,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false, 
   const printReport = () => window.print();
 
   if (!managementMode) {
-    return <LibraryReaderView books={books.length ? books : INITIAL_BOOKS} search={search} setSearch={setSearch} onBorrow={async () => {
+    return <LibraryReaderView books={books} search={search} setSearch={setSearch} onBorrow={async () => {
       setActivePage('borrowing');
       setShowBorrowModal(true);
     }} />;
@@ -199,10 +198,10 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false, 
 
   if (dashboardView) {
     const dashboardStatCards = [
-      { label: 'Total Books', value: books.reduce((sum, book) => sum + book.totalCopies, 0).toLocaleString(), trend: '12%', icon: BookOpen, gradient: 'from-blue-500 to-blue-700', shadow: 'shadow-blue-500/25' },
-      { label: 'Library Members', value: members.length.toLocaleString(), trend: '8%', icon: Users, gradient: 'from-emerald-500 to-green-600', shadow: 'shadow-emerald-500/25' },
-      { label: 'Current Loans', value: activeLoans.length.toLocaleString(), trend: '5%', icon: RotateCcw, gradient: 'from-violet-500 to-purple-600', shadow: 'shadow-violet-500/25' },
-      { label: 'Overdue Books', value: overdue.length.toLocaleString(), trend: '2%', icon: AlertTriangle, gradient: 'from-orange-400 to-orange-600', shadow: 'shadow-orange-500/25' },
+      { label: 'Total Books', value: books.reduce((sum, book) => sum + book.totalCopies, 0).toLocaleString(), detail: `${books.length} catalog titles`, icon: BookOpen, gradient: 'from-blue-500 via-blue-600 to-indigo-700', shadow: 'shadow-blue-500/25' },
+      { label: 'Library Members', value: members.length.toLocaleString(), detail: 'Registered readers', icon: Users, gradient: 'from-emerald-500 via-emerald-600 to-teal-700', shadow: 'shadow-emerald-500/25' },
+      { label: 'Current Loans', value: activeLoans.length.toLocaleString(), detail: 'Books on loan', icon: RotateCcw, gradient: 'from-violet-500 via-purple-600 to-fuchsia-700', shadow: 'shadow-violet-500/25' },
+      { label: 'Overdue Books', value: overdue.length.toLocaleString(), detail: overdue.length ? 'Needs attention' : 'No overdue books', icon: AlertTriangle, gradient: 'from-orange-400 via-orange-500 to-rose-600', shadow: 'shadow-orange-500/25' },
     ];
     const categoryCounts = books.reduce<Record<string, number>>((counts, book) => {
       const category = book.category || 'Others';
@@ -210,12 +209,24 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false, 
       return counts;
     }, {});
     const categories = Object.entries(categoryCounts).slice(0, 4);
+    const categoryTotal = Object.values(categoryCounts).reduce((sum, count) => sum + count, 0);
+    const categoryPalette = ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6'];
+    let categoryCursor = 0;
+    const categoryConic = categories.map(([, count], index) => {
+      const start = categoryCursor;
+      categoryCursor += categoryTotal > 0 ? (count / categoryTotal) * 100 : 0;
+      return `${categoryPalette[index]} ${start}% ${categoryCursor}%`;
+    }).join(', ');
 
     return (
       <section className="space-y-5">
-        <header className="rounded-3xl border border-blue-100 bg-white px-5 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xl font-black text-blue-950 dark:text-white">Welcome Back, Librarian! <span className="text-amber-400">👋</span></p>
-          <p className="mt-1 text-xs font-semibold text-slate-500">Manage books, members and library activities efficiently.</p>
+        <header className="relative overflow-hidden rounded-[28px] border border-blue-100 bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-900 px-5 py-5 text-white shadow-xl shadow-blue-950/10 dark:border-blue-900/40">
+          <div className="absolute -right-16 -top-24 h-56 w-56 rounded-full bg-blue-400/20 blur-2xl" />
+          <div className="relative">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-200">Library operations</p>
+            <p className="mt-1 text-xl font-black sm:text-2xl">Welcome Back, Librarian! <span className="text-amber-300">👋</span></p>
+            <p className="mt-1 text-xs font-semibold text-blue-100/75">Manage books, members and library activities efficiently.</p>
+          </div>
         </header>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -226,7 +237,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false, 
                 <div><p className="text-sm font-bold text-white/90">{stat.label}</p><p className="mt-1 text-3xl font-black">{stat.value}</p></div>
                 <stat.icon className="h-9 w-9" />
               </div>
-              <p className="relative mt-2 text-xs font-bold text-white/90">↑ {stat.trend}</p>
+              <p className="relative mt-2 text-xs font-bold text-white/90">{stat.detail}</p>
             </article>
           ))}
         </div>
@@ -260,10 +271,19 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false, 
           <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <h2 className="font-black text-blue-950 dark:text-white">Books by Category</h2>
             <div className="mt-5 flex items-center gap-5">
-              <div className="relative h-36 w-36 rounded-full" style={{ background: 'conic-gradient(#3b82f6 0 35%, #22c55e 35% 63%, #f59e0b 63% 83%, #8b5cf6 83% 100%)' }}>
+              <div className="relative h-36 w-36 rounded-full" style={{ background: categoryConic ? `conic-gradient(${categoryConic})` : '#e2e8f0' }}>
                 <div className="absolute inset-7 grid place-items-center rounded-full bg-white text-center dark:bg-slate-900"><div><strong className="text-xl">{books.reduce((sum, book) => sum + book.totalCopies, 0).toLocaleString()}</strong><small className="block text-[10px] text-slate-500">Total Books</small></div></div>
               </div>
-              <div className="space-y-2 text-xs">{['Textbooks','Literature','Science','Others'].map((category,index)=><div key={category} className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{background:['#3b82f6','#22c55e','#f59e0b','#8b5cf6'][index]}}/><span className="text-slate-500">{category}</span><strong className="ml-auto">{[35,28,20,17][index]}%</strong></div>)}</div>
+              <div className="min-w-0 flex-1 space-y-2 text-xs">
+                {categories.map(([category, count], index) => (
+                  <div key={category} className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: categoryPalette[index] }} />
+                    <span className="truncate text-slate-500">{category}</span>
+                    <strong className="ml-auto">{categoryTotal > 0 ? Math.round((count / categoryTotal) * 100) : 0}%</strong>
+                  </div>
+                ))}
+                {categories.length === 0 && <p className="text-slate-400">No catalog categories yet.</p>}
+              </div>
             </div>
           </article>
 
@@ -275,10 +295,10 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false, 
           <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <h2 className="font-black text-blue-950 dark:text-white">Recent Activities</h2>
             <div className="mt-4 space-y-3">{[
-              ['New book added to the catalog', '2 hours ago', BookOpen, 'bg-blue-500'],
-              [`${activeLoans.length} books are currently borrowed`, '3 hours ago', Users, 'bg-emerald-500'],
-              [`${returned.length} books have been returned`, '5 hours ago', RotateCcw, 'bg-orange-500'],
-              [`${overdue.length} overdue books need attention`, '7 hours ago', AlertTriangle, 'bg-purple-500'],
+              ['Catalog contains registered books', 'Live', BookOpen, 'bg-blue-500'],
+              [`${activeLoans.length} books are currently borrowed`, 'Live', Users, 'bg-emerald-500'],
+              [`${returned.length} books have been returned`, 'Record', RotateCcw, 'bg-orange-500'],
+              [`${overdue.length} overdue books need attention`, overdue.length ? 'Action' : 'Clear', AlertTriangle, 'bg-purple-500'],
             ].map(([text,time,Icon,color]) => <div key={String(text)} className="flex items-center gap-3 text-xs"><div className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-white ${String(color)}`}>{React.createElement(Icon as React.ElementType, { className:'h-4 w-4' })}</div><div className="min-w-0 flex-1"><p className="font-bold text-slate-700 dark:text-slate-200">{String(text)}</p></div><span className="shrink-0 text-[10px] text-slate-400">{String(time)}</span></div>)}</div>
           </article>
         </div>
