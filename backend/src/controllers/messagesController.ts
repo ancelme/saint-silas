@@ -25,7 +25,7 @@ export async function getFeedbackInbox(req: AuthRequest, res: Response) {
       senderName: message.sender_name,
       senderRole: message.sender_role,
       subject: message.subject,
-      body: message.body,
+      ...decodeChatMessage(message.body || ''),
       isRead: Number(message.is_read) === 1,
       createdAt: message.created_at,
     })));

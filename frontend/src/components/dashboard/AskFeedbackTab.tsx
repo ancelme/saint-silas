@@ -8,13 +8,16 @@ import {
   LockKeyhole,
   MessageCircleQuestion,
   MessageSquareText,
+  Paperclip,
   Send,
   ShieldCheck,
   UserRound,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
   ChatContact,
+  ChatAttachment,
   FeedbackRequest,
   fetchChatContacts,
   fetchFeedbackInbox,
@@ -29,7 +32,7 @@ type RecipientRole = 'admin' | 'owner';
 export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) => void }> = ({ onOpenConversation }) => {
   const { user } = useAuth();
   const canViewInbox = ['owner', 'super_admin', 'admin'].includes(user?.role || '');
-  const canReplyPrivately = ['owner', 'super_admin'].includes(user?.role || '');
+  const canReplyPrivately = ['owner', 'super_admin', 'admin'].includes(user?.role || '');
   const [contacts, setContacts] = useState<ChatContact[]>([]);
   const [inbox, setInbox] = useState<FeedbackRequest[]>([]);
   const [selectedRequestId, setSelectedRequestId] = useState('');
@@ -42,11 +45,79 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
   const [category, setCategory] = useState<'Report' | 'Question' | 'Feedback'>('Report');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingInbox, setIsLoadingInbox] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState('');
   const [inboxError, setInboxError] = useState('');
+  const attachmentInputRef = React.useRef<HTMLInputElement>(null);
+
+  const readAttachment = (file: File): Promise<ChatAttachment> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      name: file.name,
+      mimeType: file.type,
+      size: file.size,
+      dataUrl: String(reader.result || ''),
+    });
+    reader.onerror = () => reject(new Error(`Unable to read ${file.name}.`));
+    reader.readAsDataURL(file);
+  });
+
+  const addAttachments = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const mimeTypesByExtension: Record<string, string> = {
+      pdf: 'application/pdf',
+      doc: 'application/msword',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      xls: 'application/vnd.ms-excel',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ppt: 'application/vnd.ms-powerpoint',
+      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      txt: 'text/plain',
+      csv: 'text/csv',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      png: 'image/png',
+      webp: 'image/webp',
+    };
+    const allowedTypes = new Set(Object.values(mimeTypesByExtension));
+    const selected = Array.from(files);
+    if (attachments.length + selected.length > 5) {
+      setError('Attach up to 5 documents or images per report.');
+      return;
+    }
+    const fileMimeType = (file: File) => {
+      if (allowedTypes.has(file.type)) return file.type;
+      const extension = file.name.split('.').pop()?.toLowerCase() || '';
+      return mimeTypesByExtension[extension] || '';
+    };
+    if (selected.some(file => !fileMimeType(file))) {
+      setError('Use PDF, Word, Excel, PowerPoint, text, CSV, or common image files.');
+      return;
+    }
+    if ([...attachments, ...selected].reduce((total, item) => total + item.size, 0) > 6 * 1024 * 1024) {
+      setError('All attachments must total 6 MB or less.');
+      return;
+    }
+    setError('');
+    try {
+      const loaded = await Promise.all(selected.map(async file => {
+        const mimeType = fileMimeType(file);
+        const attachment = await readAttachment(file);
+        return {
+          ...attachment,
+          mimeType,
+          dataUrl: attachment.dataUrl.replace(/^data:[^;]+;/, `data:${mimeType};`),
+        };
+      }));
+      setAttachments(current => [...current, ...loaded]);
+    } catch (attachmentError) {
+      setError(attachmentError instanceof Error ? attachmentError.message : 'Unable to read the selected files.');
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -136,10 +207,12 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
         selectedRecipient.id,
         message.trim(),
         `${category}: ${subject.trim()}`,
+        attachments,
       );
       notifySuccess(`Your ${category.toLowerCase()} was sent to ${selectedRecipient.fullName}.`);
       setSubject('');
       setMessage('');
+      setAttachments([]);
     } catch (sendError) {
       setError(sendError instanceof Error ? sendError.message : 'Unable to send your message.');
     } finally {
@@ -281,7 +354,9 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
                           {!item.isRead && <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" title="Unread" />}
                         </span>
                         <span className="mt-0.5 block truncate text-[10px] font-semibold text-sky-800 dark:text-sky-300">{item.subject}</span>
-                        <span className="mt-1 block truncate text-[10px] text-slate-500">{item.body}</span>
+                        <span className="mt-1 block truncate text-[10px] text-slate-500">
+                          {item.body || (item.attachments.length ? `${item.attachments.length} document(s) attached` : '')}
+                        </span>
                         <span className="mt-2 flex items-center gap-1 text-[9px] text-slate-400">
                           <Clock3 className="h-3 w-3" /> {new Date(item.createdAt.replace(' ', 'T')).toLocaleString()}
                         </span>
@@ -300,7 +375,7 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
                   <p className="text-[10px] font-bold uppercase tracking-widest text-sky-700 dark:text-sky-300">
                     {selectedRequest.subject.split(':')[0]}
                   </p>
-                  <h2 className="mt-1 text-lg font-black text-slate-900 dark:text-white">{selectedRequest.subject.replace(/^(Question|Feedback):\s*/i, '')}</h2>
+                  <h2 className="mt-1 text-lg font-black text-slate-900 dark:text-white">{selectedRequest.subject.replace(/^(Report|Question|Feedback):\s*/i, '')}</h2>
                   <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
                     <span className="font-semibold text-slate-700 dark:text-slate-300">{selectedRequest.senderName}</span>
                     <span>{selectedRequest.senderRole.replace('_', ' ')}</span>
@@ -310,7 +385,28 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
                 <div className="flex-1 px-5 py-6 sm:px-7">
                   <div className="rounded-2xl rounded-tl-sm bg-slate-100 p-4 text-sm leading-relaxed text-slate-800 dark:bg-slate-800 dark:text-slate-200">
                     <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">Private request</p>
-                    <p className="whitespace-pre-wrap break-words">{selectedRequest.body}</p>
+                  {selectedRequest.body
+                    ? <p className="whitespace-pre-wrap break-words">{selectedRequest.body}</p>
+                    : <p className="text-slate-500">Documents attached with this submission.</p>}
+                    {selectedRequest.attachments.length > 0 && (
+                      <div className="mt-4 border-t border-slate-200 pt-3 dark:border-slate-700">
+                        <p className="mb-2 text-xs font-bold">Attached documents</p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedRequest.attachments.map(attachment => (
+                            <a
+                              key={attachment.id}
+                              href={attachment.dataUrl}
+                              download={attachment.name}
+                              className="inline-flex max-w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                            >
+                              <Paperclip className="h-4 w-4 shrink-0" />
+                              <span className="truncate">{attachment.name}</span>
+                              <span className="shrink-0 text-[10px] text-slate-400">{(attachment.size / 1024).toFixed(0)} KB</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {canReplyPrivately ? <form onSubmit={handleSendReply} className="border-t border-slate-100 p-5 dark:border-slate-800 sm:p-7">
@@ -338,7 +434,7 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
                     className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   />
                   <div className="mt-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                    <p className="text-[10px] text-slate-500">Your reply is private and delivered directly to the sender’s account.</p>
+                    <p className="text-[10px] text-slate-500">Your reply is private; it will not alter the submitted report.</p>
                     <button
                       type="submit"
                       disabled={isSendingReply || !replyDraft.trim()}
@@ -429,9 +525,27 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
                       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                         From {item.senderName} · {item.senderRole.replace('_', ' ')} · {new Date(item.createdAt.replace(' ', 'T')).toLocaleString()}
                       </p>
-                      <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-300">
-                        {item.body.length > 180 ? `${item.body.slice(0, 180)}…` : item.body}
-                      </p>
+                      {item.body && (
+                        <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-300">
+                          {item.body.length > 180 ? `${item.body.slice(0, 180)}…` : item.body}
+                        </p>
+                      )}
+                      {item.attachments.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {item.attachments.map(attachment => (
+                            <a
+                              key={attachment.id}
+                              href={attachment.dataUrl}
+                              download={attachment.name}
+                              onClick={event => event.stopPropagation()}
+                              className="inline-flex max-w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                            >
+                              <Paperclip className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{attachment.name}</span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -449,8 +563,8 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
         </section>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <form onSubmit={handleSubmit} className="space-y-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
+      <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <form onSubmit={handleSubmit} className="min-w-0 space-y-5 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-7">
           {error && (
             <div role="alert" className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -495,7 +609,7 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
             <span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-300">Message type</span>
             <select
               value={category}
-              onChange={event => setCategory(event.target.value as 'Question' | 'Feedback')}
+              onChange={event => setCategory(event.target.value as 'Report' | 'Question' | 'Feedback')}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
             >
               <option value="Report">Share a report</option>
@@ -522,17 +636,58 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
               value={message}
               onChange={event => setMessage(event.target.value)}
               maxLength={2000}
-              required
+              required={attachments.length === 0}
               rows={6}
-              placeholder="Write your question or feedback…"
+              placeholder="Describe the report or add context for your documents…"
               className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
             />
             <span className="mt-1 block text-right text-[11px] text-slate-400">{message.length}/2000</span>
           </label>
 
+          <div className="space-y-3">
+            <input
+              ref={attachmentInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.jpg,.jpeg,.png,.webp"
+              className="hidden"
+              onChange={event => {
+                void addAttachments(event.target.files);
+                event.target.value = '';
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => attachmentInputRef.current?.click()}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200 sm:w-auto"
+            >
+              <Paperclip className="h-4 w-4" /> Attach documents or images
+            </button>
+            <p className="text-[11px] text-slate-500">Up to 5 files, 6 MB total. PDF, Office documents, text, CSV, and images are supported.</p>
+            {attachments.length > 0 && (
+              <ul className="grid min-w-0 gap-2 sm:grid-cols-2">
+                {attachments.map(attachment => (
+                  <li key={attachment.id} className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 p-2.5 text-xs dark:border-slate-700">
+                    <Paperclip className="h-4 w-4 shrink-0 text-emerald-600" />
+                    <span className="min-w-0 flex-1 truncate font-semibold text-slate-700 dark:text-slate-200">{attachment.name}</span>
+                    <span className="shrink-0 text-slate-400">{(attachment.size / 1024).toFixed(0)} KB</span>
+                    <button
+                      type="button"
+                      onClick={() => setAttachments(current => current.filter(item => item.id !== attachment.id))}
+                      className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                      aria-label={`Remove ${attachment.name}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           <button
             type="submit"
-            disabled={isSending || isLoading || !selectedRecipient || !subject.trim() || !message.trim()}
+            disabled={isSending || isLoading || !selectedRecipient || !subject.trim() || (!message.trim() && attachments.length === 0)}
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             {isSending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

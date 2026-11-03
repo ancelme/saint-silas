@@ -61,6 +61,7 @@ export interface FeedbackRequest {
   senderRole: Role;
   subject: string;
   body: string;
+  attachments: ChatAttachment[];
   isRead: boolean;
   createdAt: string;
 }
