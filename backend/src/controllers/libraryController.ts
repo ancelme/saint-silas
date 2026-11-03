@@ -195,7 +195,7 @@ export async function returnBook(req: AuthRequest, res: Response) {
     const recordRes = await db.query(
       `SELECT br.*, lb.title as book_title
        FROM borrowing_records br
-       JOIN library_books lb ON br.book_id = lb.id
+       LEFT JOIN library_books lb ON br.book_id = lb.id
        WHERE br.id = ?`,
       [id]
     );
@@ -212,7 +212,9 @@ export async function returnBook(req: AuthRequest, res: Response) {
     const returnDate = new Date().toISOString().split('T')[0];
 
     // Increment available copies
-    await db.query(`UPDATE library_books SET available_copies = available_copies + 1 WHERE id = ?`, [record.book_id]);
+    if (record.book_title) {
+      await db.query(`UPDATE library_books SET available_copies = available_copies + 1 WHERE id = ?`, [record.book_id]);
+    }
 
     // Update borrowing record
     await db.query(
@@ -225,11 +227,13 @@ export async function returnBook(req: AuthRequest, res: Response) {
       userName: req.user?.fullName || 'Librarian',
       role: req.user?.role || 'librarian',
       action: 'LIBRARY_BOOK_RETURNED',
-      details: `Returned "${record.book_title}" from ${record.borrower_name}`,
+      details: `Returned "${record.book_title || 'deleted library book'}" from ${record.borrower_name}`,
       ipAddress: req.ip
     });
 
-    return res.json({ message: `Book "${record.book_title}" successfully returned and restored to shelf` });
+    const bookTitle = record.book_title || 'Deleted library book';
+    const shelfMessage = record.book_title ? ' and restored to shelf' : '';
+    return res.json({ message: `Book "${bookTitle}" successfully returned${shelfMessage}` });
   } catch (error: any) {
     return res.status(500).json({ error: error.message || 'Failed to return book' });
   }
@@ -309,7 +313,14 @@ export async function deleteLibraryBook(req: AuthRequest, res: Response) {
       return res.json({ message: 'Book deleted from library successfully' });
     }
 
-    await db.query(`DELETE FROM borrowing_records WHERE book_id = ?`, [id]);
+    const activeLoans = await db.query(
+      `SELECT COUNT(*) AS count FROM borrowing_records WHERE book_id = ? AND status = 'Borrowed'`,
+      [id],
+    );
+    if (Number(activeLoans.rows[0]?.count || 0) > 0) {
+      return res.status(409).json({ error: 'This book has active borrowings. Record all returns before deleting it.' });
+    }
+
     await db.query(`DELETE FROM library_books WHERE id = ?`, [id]);
 
     await recordAuditLog({
