@@ -790,7 +790,8 @@ class DatabaseManager {
         let copied = false;
         for (let attempt = 0; attempt < 3 && !copied; attempt += 1) {
           try {
-            fs.copyFileSync(tempPath, this.sqliteFilePath, fs.constants.COPYFILE_FICLONE);
+            fs.rmSync(this.sqliteFilePath, { force: true });
+            fs.renameSync(tempPath, this.sqliteFilePath);
             copied = true;
           } catch {
             if (attempt === 2) throw new Error('Unable to persist SQLite changes because the database file is locked.');

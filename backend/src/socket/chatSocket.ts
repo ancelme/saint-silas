@@ -244,10 +244,15 @@ export function attachChatSocket(httpServer: HttpServer) {
 
       connectedSockets.delete(userId);
       const lastSeen = new Date().toISOString();
-      await db.query(
-        `UPDATE users SET is_online = 0, last_seen_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [userId],
-      );
+      try {
+        await db.query(
+          `UPDATE users SET is_online = 0, last_seen_at = CURRENT_TIMESTAMP WHERE id = ?`,
+          [userId],
+        );
+      } catch (error) {
+        console.error('Unable to persist disconnect presence:', error);
+        return;
+      }
       if (connectedSockets.get(userId)?.size) {
         await db.query(`UPDATE users SET is_online = 1 WHERE id = ?`, [userId]);
         return;
