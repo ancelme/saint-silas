@@ -4,8 +4,33 @@ import { db } from '../db/index';
 import { AuthRequest } from '../middleware/auth';
 
 const id = () => crypto.randomUUID();
-const canManagePosts = (role?: string) => ['owner', 'super_admin', 'admin', 'head_teacher'].includes(role || '');
+const isOwner = (role?: string) => ['owner', 'super_admin'].includes(role || '');
 const canPublishAnnouncements = (role?: string) => ['owner', 'super_admin', 'admin', 'head_teacher', 'accountant', 'librarian'].includes(role || '');
+
+async function canUseSocialAction(role: string, action: 'can_post' | 'can_story' | 'can_comment' | 'can_announce') {
+  if (isOwner(role)) return true;
+  const result = await db.query(
+    'SELECT * FROM social_role_permissions WHERE role = ? LIMIT 1',
+    [role],
+  );
+  return Number(result.rows[0]?.[action] ?? 1) === 1;
+}
+
+function canViewPost(role: string, audience: unknown) {
+  if (isOwner(role)) return true;
+  const value = String(audience || 'Everyone').trim().toLowerCase();
+  if (!value || value === 'everyone' || value === 'all' || value === 'school' || value === 'school only') return true;
+  const audienceAliases: Record<string, string[]> = {
+    student: ['student', 'students'],
+    parent: ['parent', 'parents', 'families'],
+    teacher: ['teacher', 'teachers', 'staff'],
+    admin: ['admin', 'administrators', 'administration'],
+    accountant: ['accountant', 'accountants', 'finance'],
+    librarian: ['librarian', 'librarians', 'library'],
+    head_teacher: ['head_teacher', 'head teacher', 'headteachers'],
+  };
+  return (audienceAliases[role] || []).includes(value);
+}
 
 async function getAuthor(postUserId: string) {
   const result = await db.query(
@@ -15,19 +40,22 @@ async function getAuthor(postUserId: string) {
   return result.rows[0] || null;
 }
 
-export async function getSocialFeed(_req: AuthRequest, res: Response) {
+export async function getSocialFeed(req: AuthRequest, res: Response) {
   try {
+    const storyPrivacyFilter = req.user!.role === 'admin' || req.user!.role === 'owner' || req.user!.role === 'super_admin'
+      ? ''
+      : " AND COALESCE(s.privacy, 'everyone') IN ('everyone', 'school')";
     const stories = await db.query(`
       SELECT s.*, u.full_name AS author_name, u.role AS author_role, u.avatar_url AS author_avatar
       FROM stories s JOIN users u ON u.id = s.user_id
-      WHERE s.expires_at > CURRENT_TIMESTAMP ORDER BY s.created_at DESC`);
+      WHERE s.expires_at > CURRENT_TIMESTAMP${storyPrivacyFilter} ORDER BY s.created_at DESC`);
     const posts = await db.query(`
       SELECT p.*, u.full_name AS author_name, u.role AS author_role, u.avatar_url AS author_avatar
       FROM social_posts p JOIN users u ON u.id = p.user_id
       ORDER BY p.created_at DESC LIMIT 100`);
 
     const feed = [];
-    for (const post of posts.rows) {
+    for (const post of posts.rows.filter(post => canViewPost(req.user!.role, post.audience))) {
       const [media, likes, comments] = await Promise.all([
         db.query('SELECT * FROM post_media WHERE post_id = ? ORDER BY sort_order, created_at', [post.id]),
         db.query('SELECT * FROM post_likes WHERE post_id = ?', [post.id]),
@@ -55,6 +83,9 @@ export async function getSocialFeed(_req: AuthRequest, res: Response) {
 
 export async function createStory(req: AuthRequest, res: Response) {
   try {
+    if (!await canUseSocialAction(req.user!.role, 'can_story')) {
+      return res.status(403).json({ error: 'Your role is not authorized to publish stories.' });
+    }
     const { content = '', mediaUrl, mediaType = 'text', caption = '', background = '#047857', privacy = 'everyone' } = req.body;
     if (!String(content).trim() && !mediaUrl) return res.status(400).json({ error: 'Add text or media to the story.' });
     const storyId = id();
@@ -72,7 +103,7 @@ export async function createStory(req: AuthRequest, res: Response) {
 export async function deleteStory(req: AuthRequest, res: Response) {
   const story = await db.query('SELECT user_id FROM stories WHERE id = ?', [req.params.id]);
   const ownerId = story.rows[0]?.user_id;
-  if (!ownerId || (ownerId !== req.user!.id && !canManagePosts(req.user!.role))) {
+  if (!ownerId || (ownerId !== req.user!.id && !isOwner(req.user!.role))) {
     return res.status(403).json({ error: 'You cannot delete this story.' });
   }
   await db.query('DELETE FROM stories WHERE id = ?', [req.params.id]);
@@ -98,6 +129,9 @@ export async function reactToStory(req: AuthRequest, res: Response) {
 
 export async function createPost(req: AuthRequest, res: Response) {
   try {
+    if (!await canUseSocialAction(req.user!.role, 'can_post')) {
+      return res.status(403).json({ error: 'Your role is not authorized to publish posts.' });
+    }
     const { content = '', audience = 'Everyone', isAnnouncement = false, announcementType = 'General', media = [] } = req.body;
     if (!String(content).trim() && (!Array.isArray(media) || media.length === 0)) {
       return res.status(400).json({ error: 'Write something or add media.' });
@@ -129,7 +163,7 @@ export async function createPost(req: AuthRequest, res: Response) {
 export async function updatePost(req: AuthRequest, res: Response) {
   const post = await db.query('SELECT user_id FROM social_posts WHERE id = ?', [req.params.id]);
   const ownerId = post.rows[0]?.user_id;
-  if (!ownerId || (ownerId !== req.user!.id && !canManagePosts(req.user!.role))) {
+  if (!ownerId || (ownerId !== req.user!.id && !isOwner(req.user!.role))) {
     return res.status(403).json({ error: 'You cannot edit this post.' });
   }
   await db.query('UPDATE social_posts SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [
@@ -142,7 +176,7 @@ export async function updatePost(req: AuthRequest, res: Response) {
 export async function deletePost(req: AuthRequest, res: Response) {
   const post = await db.query('SELECT user_id FROM social_posts WHERE id = ?', [req.params.id]);
   const ownerId = post.rows[0]?.user_id;
-  if (!ownerId || (ownerId !== req.user!.id && !canManagePosts(req.user!.role))) {
+  if (!ownerId || (ownerId !== req.user!.id && !isOwner(req.user!.role))) {
     return res.status(403).json({ error: 'You cannot delete this post.' });
   }
   await db.query('DELETE FROM social_posts WHERE id = ?', [req.params.id]);
@@ -167,6 +201,9 @@ export async function togglePostLike(req: AuthRequest, res: Response) {
 }
 
 export async function addPostComment(req: AuthRequest, res: Response) {
+  if (!await canUseSocialAction(req.user!.role, 'can_comment')) {
+    return res.status(403).json({ error: 'Your role is not authorized to comment on posts.' });
+  }
   const { content = '', parentCommentId } = req.body;
   if (!String(content).trim()) return res.status(400).json({ error: 'Comment cannot be empty.' });
   const commentId = id();

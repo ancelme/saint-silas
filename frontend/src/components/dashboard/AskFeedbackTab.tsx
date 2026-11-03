@@ -29,6 +29,7 @@ type RecipientRole = 'admin' | 'owner';
 export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) => void }> = ({ onOpenConversation }) => {
   const { user } = useAuth();
   const canViewInbox = ['owner', 'super_admin', 'admin'].includes(user?.role || '');
+  const canReplyPrivately = ['owner', 'super_admin'].includes(user?.role || '');
   const [contacts, setContacts] = useState<ChatContact[]>([]);
   const [inbox, setInbox] = useState<FeedbackRequest[]>([]);
   const [selectedRequestId, setSelectedRequestId] = useState('');
@@ -197,7 +198,9 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
               </div>
               <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Ask &amp; Feedback Inbox</h1>
               <p className="mt-2 max-w-2xl text-sm text-sky-100/80">
-                Review private requests sent directly to your account and reply securely to each sender.
+                {canReplyPrivately
+                  ? 'Review private requests sent directly to your account and reply securely to each sender.'
+                  : 'Review authorized reports from users. This inbox is read-only; submitted reports cannot be edited or deleted.'}
               </p>
             </div>
             <div className="flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-3">
@@ -310,7 +313,7 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
                     <p className="whitespace-pre-wrap break-words">{selectedRequest.body}</p>
                   </div>
                 </div>
-                <form onSubmit={handleSendReply} className="border-t border-slate-100 p-5 dark:border-slate-800 sm:p-7">
+                {canReplyPrivately ? <form onSubmit={handleSendReply} className="border-t border-slate-100 p-5 dark:border-slate-800 sm:p-7">
                   {replyError && (
                     <div role="alert" className="mb-3 flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
                       <AlertCircle className="h-4 w-4 shrink-0" /> {replyError}
@@ -345,7 +348,11 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
                       {isSendingReply ? 'Sending reply…' : 'Send private reply'}
                     </button>
                   </div>
-                </form>
+                </form> : (
+                  <div className="border-t border-slate-100 p-5 text-xs font-semibold text-slate-500 dark:border-slate-800 sm:p-7">
+                    Read-only report access. The original submission cannot be modified or deleted by an administrator.
+                  </div>
+                )}
               </>
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
