@@ -39,7 +39,7 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [recipientRole, setRecipientRole] = useState<RecipientRole>('admin');
   const [recipientId, setRecipientId] = useState('');
-  const [category, setCategory] = useState<'Question' | 'Feedback'>('Question');
+  const [category, setCategory] = useState<'Report' | 'Question' | 'Feedback'>('Report');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -88,7 +88,7 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
     const handleIncomingMessage = (incoming: { recipientId: string; subject: string }) => {
       if (
         incoming.recipientId === user?.id &&
-        /^(question|feedback):/i.test(incoming.subject)
+        /^(report|question|feedback):/i.test(incoming.subject)
       ) {
         void loadInbox();
       }
@@ -376,7 +376,7 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
         </div>
         <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white sm:text-3xl">Ask &amp; Feedback</h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-          Send a question or share feedback directly with a school administrator or owner.
+          Send a private report, question, or feedback directly to a school administrator or owner.
         </p>
       </div>
 
@@ -386,7 +386,7 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
             <div>
               <h2 className="text-lg font-black text-slate-900 dark:text-white">Incoming requests</h2>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Questions and feedback sent directly to your account.
+                Reports, questions, and feedback sent directly to your account.
               </p>
             </div>
             <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
@@ -498,6 +498,7 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
               onChange={event => setCategory(event.target.value as 'Question' | 'Feedback')}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
             >
+              <option value="Report">Share a report</option>
               <option value="Question">Ask a question</option>
               <option value="Feedback">Share feedback</option>
             </select>

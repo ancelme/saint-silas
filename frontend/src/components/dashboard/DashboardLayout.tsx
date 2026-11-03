@@ -497,6 +497,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             )}
           </div>
 
+          <button
+            type="button"
+            onClick={() => handleTabSelect('ask-feedback')}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+            aria-label="Send a private report to an administrator or owner"
+            title="Send a private report to an administrator or owner"
+          >
+            <MessageCircleQuestion className="h-4 w-4" />
+            <span className="hidden xl:inline">Send a report</span>
+          </button>
+
           {/* Account Notifications */}
           <div className="relative">
             <button
@@ -645,7 +656,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                         isActive ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-200'
                       }`}
                       aria-label={`${navigationBadgeCounts[item.id]} ${
-                        item.id === 'admissions' ? 'pending admissions' : item.id === 'chat' ? 'unread messages' : 'unread feedback requests'
+                        item.id === 'admissions' ? 'pending admissions' : item.id === 'chat' ? 'unread messages' : 'unread reports and feedback requests'
                       }`}
                     >
                       {navigationBadgeCounts[item.id] > 99 ? '99+' : navigationBadgeCounts[item.id]}

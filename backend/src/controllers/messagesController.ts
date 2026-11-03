@@ -13,7 +13,7 @@ export async function getFeedbackInbox(req: AuthRequest, res: Response) {
        FROM messages m
        JOIN users u ON u.id = m.sender_id
        WHERE m.recipient_id = ?
-         AND (m.subject LIKE 'Question:%' OR m.subject LIKE 'Feedback:%')
+         AND (m.subject LIKE 'Question:%' OR m.subject LIKE 'Feedback:%' OR m.subject LIKE 'Report:%')
        ORDER BY m.created_at DESC
        LIMIT 200`,
       [req.user!.id],
@@ -41,7 +41,7 @@ export async function markFeedbackRequestRead(req: AuthRequest, res: Response) {
       `SELECT id FROM messages
        WHERE id = ?
          AND recipient_id = ?
-         AND (subject LIKE 'Question:%' OR subject LIKE 'Feedback:%')`,
+         AND (subject LIKE 'Question:%' OR subject LIKE 'Feedback:%' OR subject LIKE 'Report:%')`,
       [req.params.id, req.user!.id],
     );
 
@@ -56,7 +56,7 @@ export async function markFeedbackRequestRead(req: AuthRequest, res: Response) {
            read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
        WHERE id = ?
          AND recipient_id = ?
-         AND (subject LIKE 'Question:%' OR subject LIKE 'Feedback:%')`,
+         AND (subject LIKE 'Question:%' OR subject LIKE 'Feedback:%' OR subject LIKE 'Report:%')`,
       [req.params.id, req.user!.id],
     );
 
@@ -349,6 +349,13 @@ export async function sendDirectMessage(req: AuthRequest, res: Response) {
     );
     if (!recipient.rows.length) {
       return res.status(404).json({ error: 'Chat contact not found or inactive' });
+    }
+    if (
+      typeof requestedSubject === 'string' &&
+      /^(report|question|feedback):/i.test(requestedSubject.trim()) &&
+      !['admin', 'owner', 'super_admin'].includes(String(recipient.rows[0].role))
+    ) {
+      return res.status(403).json({ error: 'Reports, questions, and feedback can only be sent to an administrator or owner.' });
     }
     if (req.user!.role === 'parent' && !['owner', 'super_admin', 'admin', 'head_teacher', 'teacher'].includes(recipient.rows[0].role)) {
       return res.status(403).json({ error: 'Parents can only message school staff' });
