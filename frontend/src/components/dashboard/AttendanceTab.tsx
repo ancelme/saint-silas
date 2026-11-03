@@ -3,6 +3,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Student, AttendanceRecord } from '../../types';
 import { CalendarCheck2, Save, LoaderCircle, Trash2 } from 'lucide-react';
 import { fetchMyTeacherAssignments, MyTeacherAssignments } from '../../services/api';
+import { ShareToAdminButton } from '../common/ShareToAdminButton';
 
 interface AttendanceTabProps {
   students: Student[];
@@ -359,6 +360,12 @@ export const AttendanceTab: React.FC<AttendanceTabProps> = ({
                           </button>
                         ))}
                       </div>
+                      <ShareToAdminButton
+                        className="mt-2"
+                        label="Share"
+                        subject={`Attendance: ${s.firstName} ${s.lastName} - ${selectedDate}`}
+                        body={`Student: ${s.firstName} ${s.lastName} (${s.rollNo})\nClass: ${s.grade}\nDate: ${selectedDate}\nAttendance status: ${savedRecord?.status || curStatus}${selectedSubjectId ? `\nSubject: ${availableSubjects.find(item => item.subjectId === selectedSubjectId)?.subjectName || selectedSubjectId}` : ''}`}
+                      />
                     </td>
                   </tr>
                 );

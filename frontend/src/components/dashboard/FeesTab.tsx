@@ -5,6 +5,7 @@ import { FeeInvoice, FeePaymentRequest, Student } from '../../types';
 import { Wallet, CheckCircle2, X, Smartphone, Landmark, Banknote, ReceiptText, ShieldCheck } from 'lucide-react';
 import { fetchPaymentRequests, reviewPaymentRequest, submitParentPaymentRequest } from '../../services/api';
 import { ShareDocumentButton } from '../common/ShareDocumentButton';
+import { ShareToAdminButton } from '../common/ShareToAdminButton';
 
 type PaymentMethod = 'MTN Mobile Money' | 'Airtel Money' | 'Bank Transfer' | 'Cash';
 
@@ -394,7 +395,12 @@ export const FeesTab: React.FC<FeesTabProps> = ({ fees, students = [], onRecordP
                 <p className="text-slate-500">{request.paymentMethod} · {request.referenceNo} · {formatRWF(request.amount)}</p>
                 {request.phoneNumber && <p className="text-slate-500">Payer: {request.phoneNumber}</p>}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <ShareToAdminButton
+                  label="Share"
+                  subject={`Payment verification: ${request.studentName}`}
+                  body={`Student: ${request.studentName}\nClass: ${request.grade}\nParent / Guardian: ${request.parentName}\nAmount: ${formatRWF(request.amount)}\nPayment method: ${request.paymentMethod}\nReference: ${request.referenceNo}\nSubmitted: ${request.submittedAt}\nStatus: Pending Verification`}
+                />
                 <button
                   type="button"
                   disabled={reviewingRequestId === request.id}
@@ -492,6 +498,12 @@ export const FeesTab: React.FC<FeesTabProps> = ({ fees, students = [], onRecordP
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                      <ShareToAdminButton
+                        label="Share"
+                        subject={`Fee invoice: ${inv.invoiceNumber || inv.invoiceNo || inv.id}`}
+                        body={`Student: ${inv.studentName}\nClass: ${inv.grade}\nInvoice: ${inv.invoiceNumber || inv.invoiceNo || inv.id}\nBilled: ${formatRWF(inv.amountTotal)}\nPaid: ${formatRWF(inv.amountPaid)}\nBalance: ${formatRWF(bal)}\nStatus: ${inv.status}\nDue date: ${inv.dueDate}`}
+                      />
                       {bal > 0 && canRecordPayments ? (
                         <button
                           type="button"
@@ -507,6 +519,7 @@ export const FeesTab: React.FC<FeesTabProps> = ({ fees, students = [], onRecordP
                       ) : (
                         <span className="text-[11px] text-slate-500">Contact the school bursar</span>
                       )}
+                      </div>
                     </td>
                   </tr>
                 );

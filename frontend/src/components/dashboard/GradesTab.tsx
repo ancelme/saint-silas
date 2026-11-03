@@ -4,6 +4,7 @@ import { Student, GradeEntry } from '../../types';
 import { Award, Printer, Download, Sparkles, X, Check, FileText, Trash2, Plus, LoaderCircle } from 'lucide-react';
 import { fetchMyTeacherAssignments, MyTeacherAssignments } from '../../services/api';
 import { ShareDocumentButton } from '../common/ShareDocumentButton';
+import { ShareToAdminButton } from '../common/ShareToAdminButton';
 
 interface GradesTabProps {
   students: Student[];
@@ -294,6 +295,7 @@ export const GradesTab: React.FC<GradesTabProps> = ({
                 <th className="py-3 px-4">Total Score</th>
                 <th className="py-3 px-4">Grade</th>
                 <th className="py-3 px-4">Teacher's Remarks</th>
+                <th className="py-3 px-4">Share</th>
                 {canEditGrades && <th className="py-3 px-4">Actions</th>}
               </tr>
             </thead>
@@ -358,6 +360,13 @@ export const GradesTab: React.FC<GradesTabProps> = ({
                       <td className="py-3 px-4 text-slate-600 dark:text-slate-300 italic text-[11px]">
                         "{g.remarks}"
                       </td>
+                      <td className="py-3 px-4">
+                        <ShareToAdminButton
+                          label="Share"
+                          subject={`Grade record: ${currentStudent?.firstName} ${currentStudent?.lastName} - ${g.subject}`}
+                          body={`Student: ${currentStudent?.firstName} ${currentStudent?.lastName} (${currentStudent?.rollNo})\nClass: ${currentStudent?.grade}\nSubject: ${g.subject}\nQuiz: ${q}%\nMid-term: ${m}%\nFinal exam: ${f}%\nTotal: ${tot}%\nGrade: ${ltr}\nTeacher remarks: ${g.remarks || 'None'}`}
+                        />
+                      </td>
                       {canEditGrades && (
                         <td className="py-3 px-4">
                           <button
@@ -382,7 +391,7 @@ export const GradesTab: React.FC<GradesTabProps> = ({
                 })
               ) : (
                 <tr>
-                  <td colSpan={canEditGrades ? 9 : 8} className="p-8 text-center text-xs text-slate-500">
+                  <td colSpan={canEditGrades ? 10 : 9} className="p-8 text-center text-xs text-slate-500">
                     No individual marks recorded yet for {currentStudent?.firstName}. Developmental progress assessments are verified at end of term.
                   </td>
                 </tr>

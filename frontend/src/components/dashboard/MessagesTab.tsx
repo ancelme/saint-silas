@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { Announcement } from '../../types';
+import { ShareToAdminButton } from '../common/ShareToAdminButton';
 import {
   Send,
   Smartphone,
@@ -317,7 +318,12 @@ export const MessagesTab: React.FC<MessagesTabProps> = ({
                   {anc.content}
                 </p>
 
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-[11px] text-slate-400">
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-700/60 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+                  <ShareToAdminButton
+                    label="Share"
+                    subject={`Announcement: ${anc.title}`}
+                    body={`Announcement: ${anc.title}\nPriority: ${anc.priority}\nDate: ${anc.date}\nAudience: ${anc.targetAudience}\nContent:\n${anc.content}`}
+                  />
                   <span>Audience: {anc.targetRole}</span>
                   <span>{anc.author}</span>
                 </div>

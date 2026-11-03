@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Banknote, Plus, ReceiptText, TrendingDown } from 'lucide-react';
 import { Expense } from '../../types';
 import { createExpense, fetchExpenses } from '../../services/api';
+import { ShareToAdminButton } from '../common/ShareToAdminButton';
 
 const categories = ['Salaries', 'Utilities', 'Meals & Feeding', 'Learning Materials', 'Transport', 'Maintenance', 'Administration', 'Other'];
 
@@ -53,7 +54,7 @@ export const BursarExpensesTab: React.FC = () => {
         </div>
       </form>
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-        <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-900"><tr><th className="px-4 py-3">Description</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Date</th><th className="px-4 py-3 text-right">Amount</th></tr></thead><tbody>{loading ? <tr><td colSpan={4} className="p-8 text-center text-slate-500">Loading expenses...</td></tr> : expenses.map(expense => <tr key={expense.id} className="border-t border-slate-100 dark:border-slate-700"><td className="px-4 py-3 font-medium">{expense.title}<div className="text-xs text-slate-500">{expense.receiptNo}</div></td><td className="px-4 py-3">{expense.category}</td><td className="px-4 py-3">{expense.date}</td><td className="px-4 py-3 text-right font-semibold">{expense.amount.toLocaleString()} RWF</td></tr>)}{!loading && expenses.length === 0 && <tr><td colSpan={4} className="p-8 text-center text-slate-500">No expenses recorded.</td></tr>}</tbody></table></div>
+        <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-900"><tr><th className="px-4 py-3">Description</th><th className="px-4 py-3">Category</th><th className="px-4 py-3">Date</th><th className="px-4 py-3 text-right">Amount</th><th className="px-4 py-3 text-right">Share</th></tr></thead><tbody>{loading ? <tr><td colSpan={5} className="p-8 text-center text-slate-500">Loading expenses...</td></tr> : expenses.map(expense => <tr key={expense.id} className="border-t border-slate-100 dark:border-slate-700"><td className="px-4 py-3 font-medium">{expense.title}<div className="text-xs text-slate-500">{expense.receiptNo}</div></td><td className="px-4 py-3">{expense.category}</td><td className="px-4 py-3">{expense.date}</td><td className="px-4 py-3 text-right font-semibold">{expense.amount.toLocaleString()} RWF</td><td className="px-4 py-3 text-right"><ShareToAdminButton label="Share" subject={`Expense: ${expense.title}`} body={`Description: ${expense.title}\nCategory: ${expense.category}\nDate: ${expense.date}\nAmount: ${expense.amount.toLocaleString()} RWF\nReceipt: ${expense.receiptNo || 'Not provided'}\nNotes: ${expense.notes || 'None'}`} /></td></tr>)}{!loading && expenses.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-slate-500">No expenses recorded.</td></tr>}</tbody></table></div>
       </div>
     </div>
   </div>;

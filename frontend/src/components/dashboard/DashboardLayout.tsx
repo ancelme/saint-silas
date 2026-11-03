@@ -62,6 +62,7 @@ import { LibraryTab } from './LibraryTab';
 import { MessagesTab } from './MessagesTab';
 import { ChatTab } from './ChatTab';
 import { AskFeedbackTab } from './AskFeedbackTab';
+import { AdminReportDraft } from '../common/ShareToAdminButton';
 import { CalendarTab } from './CalendarTab';
 import { AdmissionsTab } from './AdmissionsTab';
 import { UserManagementTab } from './UserManagementTab';
@@ -167,6 +168,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [lastDashboardTab, setLastDashboardTab] = useState('overview');
   const [chatContactToOpen, setChatContactToOpen] = useState('');
+  const [feedbackDraft, setFeedbackDraft] = useState<AdminReportDraft | undefined>();
+  const clearFeedbackDraft = useCallback(() => setFeedbackDraft(undefined), []);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [dashboardSearch, setDashboardSearch] = useState('');
@@ -347,6 +350,19 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     setActiveTab(tabId);
     setIsSidebarOpen(false);
   };
+
+  useEffect(() => {
+    const handleShareReport = (event: Event) => {
+      const { detail } = event as CustomEvent<AdminReportDraft>;
+      if (!detail?.subject || !detail?.body) return;
+      setFeedbackDraft(detail);
+      setLastDashboardTab('ask-feedback');
+      setActiveTab('ask-feedback');
+      setIsSidebarOpen(false);
+    };
+    window.addEventListener('saint-silas:share-report', handleShareReport);
+    return () => window.removeEventListener('saint-silas:share-report', handleShareReport);
+  }, []);
 
   const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -833,10 +849,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           )}
 
           {activeTab === 'ask-feedback' && (
-            <AskFeedbackTab onOpenConversation={contactId => {
+            <AskFeedbackTab
+             initialReport={feedbackDraft}
+             onInitialReportConsumed={clearFeedbackDraft}
+             onOpenConversation={contactId => {
               setChatContactToOpen(contactId);
               handleTabSelect('chat');
-            }} />
+             }}
+            />
           )}
 
           {activeTab === 'calendar' && (

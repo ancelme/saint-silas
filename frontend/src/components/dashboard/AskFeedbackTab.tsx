@@ -26,10 +26,15 @@ import {
 } from '../../services/api';
 import { getChatSocket } from '../../services/chatSocket';
 import { notifySuccess } from '../common/AppSuccessToast';
+import { AdminReportDraft } from '../common/ShareToAdminButton';
 
 type RecipientRole = 'admin' | 'owner';
 
-export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) => void }> = ({ onOpenConversation }) => {
+export const AskFeedbackTab: React.FC<{
+  onOpenConversation: (contactId: string) => void;
+  initialReport?: AdminReportDraft;
+  onInitialReportConsumed?: () => void;
+}> = ({ onOpenConversation, initialReport, onInitialReportConsumed }) => {
   const { user } = useAuth();
   const canViewInbox = ['owner', 'super_admin', 'admin'].includes(user?.role || '');
   const canReplyPrivately = ['owner', 'super_admin', 'admin'].includes(user?.role || '');
@@ -43,8 +48,8 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
   const [recipientRole, setRecipientRole] = useState<RecipientRole>('admin');
   const [recipientId, setRecipientId] = useState('');
   const [category, setCategory] = useState<'Report' | 'Question' | 'Feedback'>('Report');
-  const [subject, setSubject] = useState('');
-  const [message, setMessage] = useState('');
+  const [subject, setSubject] = useState(initialReport?.subject || '');
+  const [message, setMessage] = useState(initialReport?.body || '');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingInbox, setIsLoadingInbox] = useState(false);
@@ -52,6 +57,15 @@ export const AskFeedbackTab: React.FC<{ onOpenConversation: (contactId: string) 
   const [error, setError] = useState('');
   const [inboxError, setInboxError] = useState('');
   const attachmentInputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!initialReport) return;
+    setCategory('Report');
+    setSubject(initialReport.subject);
+    setMessage(initialReport.body);
+    setAttachments([]);
+    onInitialReportConsumed?.();
+  }, [initialReport, onInitialReportConsumed]);
 
   const readAttachment = (file: File): Promise<ChatAttachment> => new Promise((resolve, reject) => {
     const reader = new FileReader();

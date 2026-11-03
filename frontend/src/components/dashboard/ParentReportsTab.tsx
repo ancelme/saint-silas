@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StudentMidtermReport } from '../../types';
 import { fetchStudentReports } from '../../services/api';
 import { ShareDocumentButton } from '../common/ShareDocumentButton';
+import { ShareToAdminButton } from '../common/ShareToAdminButton';
 
 export const ParentReportsTab: React.FC = () => {
   const [reports, setReports] = useState<StudentMidtermReport[]>([]);
@@ -42,6 +43,12 @@ export const ParentReportsTab: React.FC = () => {
               <p className="text-xs text-slate-500">{report.grade} · {report.period}</p>
             </div>
             <div className="flex items-center gap-2">
+              <ShareToAdminButton
+                label="Send to Admin"
+                subject={`${report.studentName} - ${report.period} Report`}
+                body={`Class: ${report.grade}\nAttendance: ${report.attendance.total ? Math.round((report.attendance.present / report.attendance.total) * 100) : 0}%\n${report.teacherName}'s class-teacher report.`}
+                className="text-[10px]"
+              />
               <ShareDocumentButton
                 title={`${report.studentName} - ${report.period} Report`}
                 text={`Class: ${report.grade}. Attendance: ${report.attendance.total ? Math.round((report.attendance.present / report.attendance.total) * 100) : 0}%. ${report.teacherName}'s class-teacher report.`}

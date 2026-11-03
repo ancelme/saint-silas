@@ -3,6 +3,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Role, SchoolEvent } from '../../types';
 import { Calendar, Clock, MapPin, Tag, Plus, Pencil, Trash2, X, Save } from 'lucide-react';
 import { fetchSystemSettings } from '../../services/api';
+import { ShareToAdminButton } from '../common/ShareToAdminButton';
 
 interface CalendarTabProps {
   events: SchoolEvent[];
@@ -172,16 +173,23 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({ events, currentUserRol
                 <div className="space-y-1.5 flex-1">
                   <div className="flex items-start justify-between gap-3">
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white">{evt.title}</h4>
-                    {canManageEvents && (
-                      <div className="flex shrink-0 gap-1">
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                      <ShareToAdminButton
+                        label="Share"
+                        subject={`School event: ${evt.title}`}
+                        body={`Event: ${evt.title}\nType: ${evt.type}\nDate: ${evt.date}\nTime: ${evt.time}\nLocation: ${evt.location}\nDetails: ${evt.description}`}
+                      />
+                      {canManageEvents && (
                         <button type="button" onClick={() => openEditor(evt)} disabled={isSaving} aria-label={`Edit ${evt.title}`} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
                           <Pencil className="h-4 w-4" />
                         </button>
+                      )}
+                      {canManageEvents && (
                         <button type="button" onClick={() => handleDeleteEvent(evt)} disabled={isSaving} aria-label={`Delete ${evt.title}`} className="rounded-lg p-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40">
                           <Trash2 className="h-4 w-4" />
                         </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                   <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                     {evt.description}

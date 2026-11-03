@@ -20,6 +20,7 @@ import {
   ImagePlus,
   LoaderCircle
 } from 'lucide-react';
+import { ShareToAdminButton } from '../common/ShareToAdminButton';
 
 interface StudentsTabProps {
   students: Student[];
@@ -368,6 +369,12 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                    <ShareToAdminButton
+                      label="Share"
+                      subject={`Student record: ${student.firstName} ${student.lastName}`}
+                      body={`Student: ${student.firstName} ${student.lastName}\nAdmission number: ${student.rollNo}\nClass: ${student.grade} (${student.section})\nStatus: ${student.status}\nAttendance: ${student.attendanceRate}%\nFee status: ${student.feeStatus}`}
+                    />
                     <button
                       type="button"
                       onClick={() => setActiveStudent(student)}
@@ -376,6 +383,7 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
                     >
                       <Eye className="w-4 h-4" />
                     </button>
+                    </div>
                   </td>
                 </tr>
               ))}

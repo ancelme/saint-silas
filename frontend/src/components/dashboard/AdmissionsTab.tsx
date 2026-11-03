@@ -4,6 +4,7 @@ import confetti from 'canvas-confetti';
 import { useLanguage } from '../../context/LanguageContext';
 import { AdmissionApplication, Student } from '../../types';
 import { ShareDocumentButton } from '../common/ShareDocumentButton';
+import { ShareToAdminButton } from '../common/ShareToAdminButton';
 import {
   FileCheck,
   Plus,
@@ -507,6 +508,11 @@ export const AdmissionsTab: React.FC<AdmissionsTabProps> = ({
                               <span>Letter</span>
                             </button>
                           )}
+                          <ShareToAdminButton
+                            label="Share"
+                            subject={`Admission record: ${adm.applicantName}`}
+                            body={`Applicant: ${adm.applicantName}\nApplication number: ${adm.applicationNumber || adm.id}\nApplying grade: ${adm.applyingGrade}\nAssigned stream: ${adm.assignedStream || 'Not assigned'}\nParent/guardian: ${adm.parentName}\nApplication status: ${adm.status}`}
+                          />
                         </div>
                       </td>
                     </tr>

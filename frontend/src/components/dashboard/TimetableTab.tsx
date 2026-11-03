@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { Role, TimetableSlot } from '../../types';
+import { ShareToAdminButton } from '../common/ShareToAdminButton';
 
 interface TimetableTabProps {
   timetable: TimetableSlot[];
@@ -255,6 +256,15 @@ export const TimetableTab: React.FC<TimetableTabProps> = ({ timetable, currentUs
               >
                 <Plus className="h-4 w-4" /> Add timetable entry
               </button>
+            )}
+            {gradeSlots.length > 0 && (
+              <ShareToAdminButton
+                label="Share timetable"
+                subject={`${selectedGrade} timetable`}
+                body={`${selectedGrade} timetable\n${gradeSlots
+                  .map(slot => `${slot.day}, ${slot.period}: ${slot.subject} — ${slot.teacherName}${slot.classroom ? ` (${slot.classroom})` : ''}`)
+                  .join('\n')}`}
+              />
             )}
           </div>
         </div>

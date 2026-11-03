@@ -3,6 +3,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Role, Teacher, SchoolLevel } from '../../types';
 import { Search, Plus, Mail, Phone, BookOpen, GraduationCap, X, Camera, Upload, Save, Trash2, Settings } from 'lucide-react';
 import { fetchTeacherAssignmentOptions, saveTeacherAssignments, TeacherAssignmentOptions } from '../../services/api';
+import { ShareToAdminButton } from '../common/ShareToAdminButton';
 
 interface TeachersTabProps {
   teachers: Teacher[];
@@ -268,6 +269,10 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
                 <Settings className="h-3.5 w-3.5" /> Assign classes and subjects
               </button>
             ) : null}
+            <ShareToAdminButton
+              subject={`Teacher record: ${teacher.name}`}
+              body={`Teacher: ${teacher.name}\nRole: ${teacher.teacherType === 'class_teacher' ? 'Class Teacher' : 'Subject Teacher'}\nSubject: ${teacher.subject}\nDepartment: ${teacher.department}\nQualification: ${teacher.qualification}\nAssigned classes: ${(teacher.assignedClasses || teacher.assignedGrades || []).join(', ') || 'Not listed'}\nStatus: ${teacher.status}`}
+            />
           </div>
         ))}
       </div>
