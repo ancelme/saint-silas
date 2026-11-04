@@ -37,10 +37,9 @@ import {
   ShieldCheck,
   Database,
   Bot,
-  Maximize2,
-  X
 } from 'lucide-react';
 import { AiDashboardInsights } from './AiDashboardInsights';
+import { DashboardAnalytics } from './DashboardAnalytics';
 import { RoleAiAssistantModal } from './RoleAiAssistantModal';
 
 interface OverviewTabProps {
@@ -73,7 +72,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
   // Student State: Star card modal
   const [showReportCardModal, setShowReportCardModal] = useState(false);
-  const [expandedChart, setExpandedChart] = useState<'enrollment' | 'fees' | null>(null);
   const selectedChild = students.find(student => student.id === selectedChildId) || students[0];
   const selectedChildAttendance = selectedChild
     ? attendance.filter(record => record.studentId === selectedChild.id)
@@ -106,44 +104,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
   const presentCount = attendance.filter(a => a.status === 'Present').length;
   const attendanceRate = attendance.length > 0 ? Math.round((presentCount / attendance.length) * 100) : 0;
-  const chartData = {
-    enrollment: [
-      { label: 'Nursery', value: nurseryCount, color: 'bg-violet-500' },
-      { label: 'Lower Primary', value: lowerCount, color: 'bg-sky-500' },
-      { label: 'Upper Primary', value: upperCount, color: 'bg-emerald-500' },
-    ],
-    fees: [
-      { label: 'Collected', value: totalPaid, color: 'bg-emerald-500' },
-      { label: 'Outstanding', value: totalBalance, color: 'bg-amber-500' },
-    ],
-  };
-  const canViewFeesChart = ['owner', 'super_admin', 'admin', 'accountant'].includes(currentRole);
-  const canViewEnrollmentChart = ['owner', 'super_admin', 'admin', 'head_teacher', 'teacher'].includes(currentRole);
-
-  const renderChartBars = (chart: 'enrollment' | 'fees', expanded = false) => {
-    const rows = chartData[chart];
-    const maxValue = Math.max(...rows.map(row => row.value), 1);
-    return (
-      <div className={expanded ? 'space-y-7' : 'space-y-4'}>
-        {rows.map(row => (
-          <div key={row.label} className="space-y-1.5">
-            <div className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
-              <span>{row.label}</span>
-              <span className="tabular-nums text-slate-900 dark:text-white">
-                {chart === 'fees' ? formatRWF(row.value) : row.value}
-              </span>
-            </div>
-            <div className={`overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700 ${expanded ? 'h-5' : 'h-3'}`}>
-              <div
-                className={`h-full rounded-full transition-all ${row.color}`}
-                style={{ width: `${row.value === 0 ? 0 : Math.max(4, (row.value / maxValue) * 100)}%` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-6">
@@ -226,73 +186,12 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         <AiDashboardInsights />
       )}
 
-      {(canViewEnrollmentChart || canViewFeesChart) && (
-        <section aria-label="School data charts" className="grid gap-4 lg:grid-cols-2">
-          {canViewEnrollmentChart && (
-            <button
-              type="button"
-              onClick={() => setExpandedChart('enrollment')}
-              aria-label="Expand enrollment by school level chart"
-              className="group rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-xs transition hover:border-emerald-400 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
-            >
-              <span className="mb-4 flex items-center justify-between">
-                <span>
-                  <span className="block text-sm font-bold text-slate-900 dark:text-white">Enrollment by school level</span>
-                  <span className="text-[11px] text-slate-500">Click chart to expand</span>
-                </span>
-                <Maximize2 className="h-4 w-4 text-slate-400 group-hover:text-emerald-600" />
-              </span>
-              {renderChartBars('enrollment')}
-            </button>
-          )}
-          {canViewFeesChart && (
-            <button
-              type="button"
-              onClick={() => setExpandedChart('fees')}
-              aria-label="Expand fee collection chart"
-              className="group rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-xs transition hover:border-emerald-400 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
-            >
-              <span className="mb-4 flex items-center justify-between">
-                <span>
-                  <span className="block text-sm font-bold text-slate-900 dark:text-white">Fee collection</span>
-                  <span className="text-[11px] text-slate-500">Click chart to expand</span>
-                </span>
-                <Maximize2 className="h-4 w-4 text-slate-400 group-hover:text-emerald-600" />
-              </span>
-              {renderChartBars('fees')}
-            </button>
-          )}
-        </section>
-      )}
-
-      {expandedChart && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4"
-          onMouseDown={event => {
-            if (event.target === event.currentTarget) setExpandedChart(null);
-          }}
-        >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="expanded-chart-title"
-            className="w-full max-w-4xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:p-9"
-          >
-            <div className="mb-8 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Live school records</p>
-                <h2 id="expanded-chart-title" className="mt-1 text-xl font-black text-slate-900 dark:text-white sm:text-2xl">
-                  {expandedChart === 'enrollment' ? 'Enrollment by school level' : 'Fee collection'}
-                </h2>
-              </div>
-              <button type="button" onClick={() => setExpandedChart(null)} aria-label="Close expanded chart" className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            {renderChartBars(expandedChart, true)}
-          </section>
-        </div>
-      )}
+      <DashboardAnalytics
+        students={students}
+        fees={fees}
+        attendance={attendance}
+        grades={grades}
+      />
 
       {/* ========================================================
           1. OWNER / SUPER ADMIN SPECIFIC DASHBOARD VIEW

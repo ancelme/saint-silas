@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import {
   AlertTriangle, BookOpen, Download, Library, Plus, RotateCcw,
   Search, Trash2, UserPlus, Users, X
@@ -36,6 +37,7 @@ const pages: { id: LibraryPage; label: string; icon: React.ElementType }[] = [
 ];
 
 export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false, dashboardView = false }) => {
+  const reduceMotion = useReducedMotion();
   const [activePage, setActivePage] = useState<LibraryPage>('books');
   const [books, setBooks] = useState<LibraryBook[]>([]);
   const [borrowings, setBorrowings] = useState<BorrowingRecord[]>([]);
@@ -209,7 +211,13 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false, 
       counts[category] = (counts[category] || 0) + book.totalCopies;
       return counts;
     }, {});
-    const categories = Object.entries(categoryCounts).slice(0, 4);
+    const sortedCategories = Object.entries(categoryCounts).sort(([, countA], [, countB]) => countB - countA);
+    const categories = [
+      ...sortedCategories.slice(0, 3),
+      ...(sortedCategories.length > 3
+        ? [['Other categories', sortedCategories.slice(3).reduce((sum, [, count]) => sum + count, 0)] as [string, number]]
+        : []),
+    ];
     const categoryTotal = Object.values(categoryCounts).reduce((sum, count) => sum + count, 0);
     const categoryPalette = ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6'];
     let categoryCursor = 0;
@@ -218,46 +226,196 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false, 
       categoryCursor += categoryTotal > 0 ? (count / categoryTotal) * 100 : 0;
       return `${categoryPalette[index]} ${start}% ${categoryCursor}%`;
     }).join(', ');
+    const monthlyActivity = new Map<string, { borrowed: number; returned: number }>();
+    borrowings.forEach(record => {
+      const borrowMonth = /^\d{4}-\d{2}/.test(record.borrowDate) ? record.borrowDate.slice(0, 7) : '';
+      if (borrowMonth) {
+        const month = monthlyActivity.get(borrowMonth) || { borrowed: 0, returned: 0 };
+        month.borrowed += 1;
+        monthlyActivity.set(borrowMonth, month);
+      }
+      const returnMonth = record.status === 'Returned' && record.returnDate && /^\d{4}-\d{2}/.test(record.returnDate)
+        ? record.returnDate.slice(0, 7)
+        : '';
+      if (returnMonth) {
+        const month = monthlyActivity.get(returnMonth) || { borrowed: 0, returned: 0 };
+        month.returned += 1;
+        monthlyActivity.set(returnMonth, month);
+      }
+    });
+    const activityMonths = [...monthlyActivity.entries()]
+      .sort(([monthA], [monthB]) => monthA.localeCompare(monthB))
+      .slice(-6)
+      .map(([month, counts]) => ({ month, ...counts }));
+    const activityTotal = activityMonths.reduce(
+      (totals, month) => ({ borrowed: totals.borrowed + month.borrowed, returned: totals.returned + month.returned }),
+      { borrowed: 0, returned: 0 },
+    );
+    const activityChart = (() => {
+      const width = 700;
+      const height = 220;
+      const left = 46;
+      const right = 18;
+      const top = 18;
+      const bottom = 38;
+      const chartWidth = width - left - right;
+      const chartHeight = height - top - bottom;
+      const max = Math.max(1, ...activityMonths.flatMap(month => [month.borrowed, month.returned]));
+      const points = activityMonths.map((month, index) => ({
+        ...month,
+        x: activityMonths.length === 1
+          ? left + chartWidth / 2
+          : left + (index / (activityMonths.length - 1)) * chartWidth,
+        borrowY: top + chartHeight - (month.borrowed / max) * chartHeight,
+        returnY: top + chartHeight - (month.returned / max) * chartHeight,
+      }));
+      return {
+        width,
+        height,
+        left,
+        right,
+        top,
+        bottom,
+        chartHeight,
+        points,
+        max,
+        borrowPath: points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.borrowY}`).join(' '),
+        returnPath: points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.returnY}`).join(' '),
+        labelStride: Math.max(1, Math.ceil(points.length / 6)),
+      };
+    })();
 
     return (
       <section className="space-y-5">
-        <header className="relative overflow-hidden rounded-[28px] border border-blue-100 bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-900 px-5 py-5 text-white shadow-xl shadow-blue-950/10 dark:border-blue-900/40">
+        <motion.header
+          initial={{ opacity: 0, y: reduceMotion ? 0 : 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.55 }}
+          className="relative overflow-hidden rounded-[28px] border border-blue-100 bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-900 px-5 py-5 text-white shadow-xl shadow-blue-950/10 dark:border-blue-900/40"
+        >
           <div className="absolute -right-16 -top-24 h-56 w-56 rounded-full bg-blue-400/20 blur-2xl" />
           <div className="relative">
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-200">Library operations</p>
             <p className="mt-1 text-xl font-black sm:text-2xl">Welcome Back, Librarian! <span className="text-amber-300">👋</span></p>
             <p className="mt-1 text-xs font-semibold text-blue-100/75">Manage books, members and library activities efficiently.</p>
           </div>
-        </header>
+        </motion.header>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {dashboardStatCards.map(stat => (
-            <article key={stat.label} className={`relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br ${stat.gradient} p-5 text-white shadow-lg ${stat.shadow}`}>
+          {dashboardStatCards.map((stat, index) => (
+            <motion.article
+              key={stat.label}
+              initial={{ opacity: 0, y: reduceMotion ? 0 : 16, scale: reduceMotion ? 1 : 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: reduceMotion ? 0 : 0.5, delay: reduceMotion ? 0 : index * 0.07 }}
+              whileHover={reduceMotion ? undefined : { y: -4 }}
+              className={`relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br ${stat.gradient} p-5 text-white shadow-lg ${stat.shadow}`}
+            >
               <stat.icon className="absolute -bottom-2 -right-1 h-24 w-24 rotate-[-8deg] opacity-15" />
               <div className="relative flex items-start justify-between">
                 <div><p className="text-sm font-bold text-white/90">{stat.label}</p><p className="mt-1 text-3xl font-black">{stat.value}</p></div>
                 <stat.icon className="h-9 w-9" />
               </div>
               <p className="relative mt-2 text-xs font-bold text-white/90">{stat.detail}</p>
-            </article>
+            </motion.article>
           ))}
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-          <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="flex items-center justify-between"><h2 className="flex items-center gap-2 font-black text-blue-950 dark:text-white"><span className="h-7 w-1 rounded-full bg-blue-600" />Library Activity Overview</h2><span className="text-xs font-bold text-blue-700">This Month⌄</span></div>
-            <div className="mt-5 h-52">
-              <svg viewBox="0 0 700 220" className="h-full w-full" role="img" aria-label="Library borrowing and returns chart">
-                {[30, 75, 120, 165].map(y => <line key={y} x1="40" x2="680" y1={y} y2={y} stroke="currentColor" className="text-slate-200 dark:text-slate-800" />)}
-                <path d="M42 165 C95 150 125 125 180 115 S260 58 325 75 S420 122 490 62 S590 32 670 78" fill="none" stroke="#3b82f6" strokeWidth="4" />
-                <path d="M42 185 C105 172 130 146 180 137 S260 95 325 105 S420 124 490 100 S590 75 670 105" fill="none" stroke="#22c55e" strokeWidth="4" />
-                {[42, 180, 325, 490, 670].map((x, index) => <circle key={x} cx={x} cy={[165,115,75,62,78][index]} r="5" fill="#3b82f6" />)}
-                {[42,180,325,490,670].map((x,index)=><circle key={`g-${x}`} cx={x} cy={[185,137,105,100,105][index]} r="5" fill="#22c55e" />)}
-              </svg>
+          <motion.article
+            initial={{ opacity: 0, y: reduceMotion ? 0 : 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.55, delay: reduceMotion ? 0 : 0.2 }}
+            className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 font-black text-blue-950 dark:text-white"><span className="h-7 w-1 rounded-full bg-blue-600" />Monthly Library Activity</h2>
+                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Actual issue and return dates • latest recorded months</p>
+              </div>
+              <div className="flex flex-wrap gap-3 text-[10px] font-bold text-slate-500">
+                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-blue-500" />Issued {activityTotal.borrowed}</span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" />Returned {activityTotal.returned}</span>
+              </div>
             </div>
-          </article>
+            {loading ? (
+              <div className="mt-5 h-52 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" aria-label="Loading library activity chart" />
+            ) : activityChart.points.length ? (
+              <div className="mt-5 h-52">
+                <svg
+                  viewBox={`0 0 ${activityChart.width} ${activityChart.height}`}
+                  className="h-full w-full"
+                  role="img"
+                  aria-label="Monthly library books issued and returned from recorded loan dates"
+                >
+                  {Array.from({ length: 4 }, (_, index) => {
+                    const value = Math.round((activityChart.max * index) / 3);
+                    const y = activityChart.top + activityChart.chartHeight - (value / activityChart.max) * activityChart.chartHeight;
+                    return (
+                      <g key={index}>
+                        <line x1={activityChart.left} x2={activityChart.width - activityChart.right} y1={y} y2={y} stroke="currentColor" className="text-slate-200 dark:text-slate-800" strokeDasharray={index ? '3 5' : undefined} />
+                        <text x="0" y={y + 3} className="fill-slate-400 text-[9px]">{value}</text>
+                      </g>
+                    );
+                  })}
+                  {activityChart.points.length > 1 && (
+                    <>
+                      <motion.path d={activityChart.borrowPath} fill="none" stroke="#3b82f6" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: reduceMotion ? 1 : 0 }} animate={{ pathLength: 1 }} transition={{ duration: reduceMotion ? 0 : 1, ease: 'easeOut' }} />
+                      <motion.path d={activityChart.returnPath} fill="none" stroke="#22c55e" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: reduceMotion ? 1 : 0 }} animate={{ pathLength: 1 }} transition={{ duration: reduceMotion ? 0 : 1, delay: reduceMotion ? 0 : 0.15, ease: 'easeOut' }} />
+                    </>
+                  )}
+                  {activityChart.points.map((point, index) => (
+                    <g key={point.month}>
+                      {point.borrowed > 0 && (
+                        <motion.circle
+                          cx={point.x}
+                          cy={point.borrowY}
+                          r="4.5"
+                          fill="#3b82f6"
+                          initial={{ scale: reduceMotion ? 1 : 0, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ delay: reduceMotion ? 0 : 0.1 + index * 0.05, duration: reduceMotion ? 0 : 0.25 }}
+                          style={{ transformOrigin: `${point.x}px ${point.borrowY}px` }}
+                        >
+                          <title>{`${point.month}: ${point.borrowed} books issued`}</title>
+                        </motion.circle>
+                      )}
+                      {point.returned > 0 && (
+                        <motion.circle
+                          cx={point.x}
+                          cy={point.returnY}
+                          r="4.5"
+                          fill="#22c55e"
+                          initial={{ scale: reduceMotion ? 1 : 0, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ delay: reduceMotion ? 0 : 0.25 + index * 0.05, duration: reduceMotion ? 0 : 0.25 }}
+                          style={{ transformOrigin: `${point.x}px ${point.returnY}px` }}
+                        >
+                          <title>{`${point.month}: ${point.returned} books returned`}</title>
+                        </motion.circle>
+                      )}
+                      {(index % activityChart.labelStride === 0 || index === activityChart.points.length - 1) && (
+                        <text x={point.x} y={activityChart.height - 8} textAnchor="middle" className="fill-slate-400 text-[10px]">
+                          {new Date(`${point.month}-01T00:00:00`).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })}
+                        </text>
+                      )}
+                    </g>
+                  ))}
+                </svg>
+              </div>
+            ) : (
+              <div className="mt-5 grid h-52 place-items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-center dark:border-slate-700 dark:bg-slate-950/40">
+                <p className="max-w-xs px-5 text-xs leading-relaxed text-slate-500">Recorded borrowing and return dates will appear here. No sample chart data is shown.</p>
+              </div>
+            )}
+          </motion.article>
 
-          <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <motion.article
+            initial={{ opacity: 0, y: reduceMotion ? 0 : 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.55, delay: reduceMotion ? 0 : 0.26 }}
+            className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+          >
             <h2 className="flex items-center gap-2 font-black text-blue-950 dark:text-white"><span className="text-yellow-400">⚡</span> Quick Actions</h2>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <QuickAction label="Add Book" icon={BookOpen} colors="from-blue-600 to-blue-800" onClick={() => setShowBookModal(true)} />
@@ -265,38 +423,57 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({ managementMode = false, 
               <QuickAction label="Record Borrowing" icon={RotateCcw} colors="from-purple-500 to-purple-700" onClick={() => setShowBorrowModal(true)} />
               <QuickAction label="Record Return" icon={RotateCcw} colors="from-orange-400 to-orange-600" onClick={() => setActivePage('returns')} />
             </div>
-          </article>
+          </motion.article>
         </div>
 
         <div className="grid gap-5 lg:grid-cols-3">
-          <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <motion.article
+            initial={{ opacity: 0, y: reduceMotion ? 0 : 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.55, delay: reduceMotion ? 0 : 0.3 }}
+            className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+          >
             <h2 className="font-black text-blue-950 dark:text-white">Books by Category</h2>
-            <div className="mt-5 flex items-center gap-5">
-              <div className="relative h-36 w-36 rounded-full" style={{ background: categoryConic ? `conic-gradient(${categoryConic})` : '#e2e8f0' }}>
-                <div className="absolute inset-7 grid place-items-center rounded-full bg-white text-center dark:bg-slate-900"><div><strong className="text-xl">{books.reduce((sum, book) => sum + book.totalCopies, 0).toLocaleString()}</strong><small className="block text-[10px] text-slate-500">Total Books</small></div></div>
+            {categories.length > 0 ? (
+              <div className="mt-5 flex items-center gap-5">
+                <motion.div
+                  initial={{ opacity: 0, scale: reduceMotion ? 1 : 0.8, rotate: reduceMotion ? 0 : -20 }}
+                  animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.8, ease: [0.22, 1, 0.36, 1] }}
+                  className="relative h-36 w-36 shrink-0 rounded-full shadow-lg shadow-blue-900/10"
+                  style={{ background: `conic-gradient(${categoryConic})` }}
+                  role="img"
+                  aria-label={`Book copies by category, ${categoryTotal} total`}
+                >
+                  <div className="absolute inset-7 grid place-items-center rounded-full bg-white text-center dark:bg-slate-900"><div><strong className="text-xl">{categoryTotal.toLocaleString()}</strong><small className="block text-[10px] text-slate-500">Total Copies</small></div></div>
+                </motion.div>
+                <div className="min-w-0 flex-1 space-y-2 text-xs">
+                  {categories.map(([category, count], index) => (
+                    <div key={category} className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: categoryPalette[index] }} />
+                      <span className="truncate text-slate-500">{category}</span>
+                      <strong className="ml-auto tabular-nums text-slate-700 dark:text-slate-200">{count} <span className="font-normal text-slate-400">({categoryTotal > 0 ? Math.round((count / categoryTotal) * 100) : 0}%)</span></strong>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="min-w-0 flex-1 space-y-2 text-xs">
-                {categories.map(([category, count], index) => (
-                  <div key={category} className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: categoryPalette[index] }} />
-                    <span className="truncate text-slate-500">{category}</span>
-                    <strong className="ml-auto">{categoryTotal > 0 ? Math.round((count / categoryTotal) * 100) : 0}%</strong>
-                  </div>
-                ))}
-                {categories.length === 0 && <p className="text-slate-400">No catalog categories yet.</p>}
-              </div>
-            </div>
-          </article>
+            ) : <p className="mt-4 rounded-2xl border border-dashed border-slate-200 p-5 text-center text-xs text-slate-500 dark:border-slate-700">Catalog category totals will appear when books are added.</p>}
+          </motion.article>
 
-          <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <motion.article
+            initial={{ opacity: 0, y: reduceMotion ? 0 : 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.55, delay: reduceMotion ? 0 : 0.34 }}
+            className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+          >
             <h2 className="font-black text-blue-950 dark:text-white">Recent Books</h2>
-            <div className="mt-4 space-y-3">{books.slice(0, 3).map(book => <div key={book.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800"><div className="grid h-12 w-10 place-items-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-800 text-white"><BookOpen className="h-5 w-5" /></div><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{book.title}</p><p className="truncate text-[10px] text-slate-500">by {book.author}</p></div><span className="rounded-lg bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-700">Available</span></div>)}</div>
-          </article>
+            <div className="mt-4 space-y-3">{books.slice(0, 3).map(book => <div key={book.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800"><div className="grid h-12 w-10 place-items-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-800 text-white"><BookOpen className="h-5 w-5" /></div><div className="min-w-0 flex-1"><p className="truncate text-xs  font-bold">{book.title}</p><p className="truncate text-[10px] text-slate-500">by {book.author}</p></div><span className="rounded-lg bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-700">Available</span></div>)}</div>
+          </motion.article>
 
           <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <h2 className="font-black text-blue-950 dark:text-white">Recent Activities</h2>
             <div className="mt-4 space-y-3">{[
-              ['Catalog contains registered books', 'Live', BookOpen, 'bg-blue-500'],
+              [`${books.length} catalog titles are registered`, 'Catalog', BookOpen, 'bg-blue-500'],
               [`${activeLoans.length} books are currently borrowed`, 'Live', Users, 'bg-emerald-500'],
               [`${returned.length} books have been returned`, 'Record', RotateCcw, 'bg-orange-500'],
               [`${overdue.length} overdue books need attention`, overdue.length ? 'Action' : 'Clear', AlertTriangle, 'bg-purple-500'],

@@ -20,6 +20,9 @@ export const AiDashboardInsights: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  const insightText = (value?: string) =>
+    value?.trim() || 'No current insight is available. Review the charts below for recorded school data.';
+
   const loadInsights = async () => {
     setIsLoading(true);
     setError(null);
@@ -28,7 +31,7 @@ export const AiDashboardInsights: React.FC = () => {
       setData(res);
     } catch (err: any) {
       console.warn('Failed to load live AI insights:', err);
-      setError('Could not retrieve latest AI analysis. Showing verified database state.');
+      setError('AI insights could not be loaded. The dashboard charts below continue to show available records.');
     } finally {
       setIsLoading(false);
     }
@@ -112,7 +115,7 @@ export const AiDashboardInsights: React.FC = () => {
               </div>
             ) : (
               <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
-                {data?.insights.schoolSummary}
+                {insightText(data?.insights.schoolSummary)}
               </p>
             )}
           </div>
@@ -138,7 +141,7 @@ export const AiDashboardInsights: React.FC = () => {
                 Attendance Insight
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300">
-                {data?.metrics.attendanceRate || 98}% Rate
+                {data?.metrics ? `${data.metrics.attendanceRate}% Rate` : 'Unavailable'}
               </span>
             </div>
             {isLoading ? (
@@ -148,12 +151,12 @@ export const AiDashboardInsights: React.FC = () => {
               </div>
             ) : (
               <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
-                {data?.insights.attendanceInsight}
+                {insightText(data?.insights.attendanceInsight)}
               </p>
             )}
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60 text-[11px] font-semibold text-teal-600 dark:text-teal-400">
-            Daily feeding program actively synchronized
+            {data?.metrics ? 'Based on recorded attendance data' : 'No attendance metric available'}
           </div>
         </motion.div>
 
@@ -171,7 +174,7 @@ export const AiDashboardInsights: React.FC = () => {
                 Academic Insight
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
-                REB CBC Standard
+                Current records
               </span>
             </div>
             {isLoading ? (
@@ -181,12 +184,12 @@ export const AiDashboardInsights: React.FC = () => {
               </div>
             ) : (
               <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
-                {data?.insights.academicInsight}
+                {insightText(data?.insights.academicInsight)}
               </p>
             )}
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-            100% PLE National Target Track
+            AI summary of available academic records
           </div>
         </motion.div>
 
@@ -204,7 +207,7 @@ export const AiDashboardInsights: React.FC = () => {
                 Fee & Revenue Insight
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                {data?.metrics.collectionRate || 0}% Collected
+                {data?.metrics ? `${data.metrics.collectionRate}% Collected` : 'Unavailable'}
               </span>
             </div>
             {isLoading ? (
@@ -214,7 +217,7 @@ export const AiDashboardInsights: React.FC = () => {
               </div>
             ) : (
               <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
-                {data?.insights.feeInsight}
+                {insightText(data?.insights.feeInsight)}
               </p>
             )}
           </div>
@@ -250,12 +253,12 @@ export const AiDashboardInsights: React.FC = () => {
               </div>
             ) : (
               <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
-                {data?.insights.importantAlerts}
+                {insightText(data?.insights.importantAlerts)}
               </p>
             )}
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60 text-[11px] font-semibold text-amber-600">
-            {data?.metrics.pendingAdmissions || 0} Pending Admissions
+            {data?.metrics ? `${data.metrics.pendingAdmissions} Pending Admissions` : 'Admissions metric unavailable'}
           </div>
         </motion.div>
 
@@ -283,12 +286,14 @@ export const AiDashboardInsights: React.FC = () => {
               </div>
             ) : (
               <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-normal">
-                {data?.insights.recommendedActions}
+                {insightText(data?.insights.recommendedActions)}
               </p>
             )}
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60 text-[11px] font-semibold text-emerald-600">
-            Automated recommendations updated daily
+            {data?.generatedAt
+              ? `Generated ${new Date(data.generatedAt).toLocaleString()}`
+              : 'No generated insight timestamp'}
           </div>
         </motion.div>
       </div>
