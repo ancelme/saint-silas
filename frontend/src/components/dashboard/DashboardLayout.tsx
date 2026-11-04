@@ -168,8 +168,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [lastDashboardTab, setLastDashboardTab] = useState('overview');
   const [chatContactToOpen, setChatContactToOpen] = useState('');
-  const [feedbackDraft, setFeedbackDraft] = useState<AdminReportDraft | undefined>();
-  const clearFeedbackDraft = useCallback(() => setFeedbackDraft(undefined), []);
+  const [shareDraft, setShareDraft] = useState<AdminReportDraft | undefined>();
+  const clearShareDraft = useCallback(() => setShareDraft(undefined), []);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [dashboardSearch, setDashboardSearch] = useState('');
@@ -352,17 +352,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   };
 
   useEffect(() => {
-    const handleShareReport = (event: Event) => {
+    const handleShareRecord = (event: Event) => {
       const { detail } = event as CustomEvent<AdminReportDraft>;
       if (!detail?.subject || !detail?.body) return;
-      setFeedbackDraft(detail);
-      setLastDashboardTab('ask-feedback');
-      setActiveTab('ask-feedback');
+      setShareDraft(detail);
+      if (activeTab !== 'chat') setLastDashboardTab(activeTab);
+      setActiveTab('chat');
       setIsSidebarOpen(false);
     };
-    window.addEventListener('saint-silas:share-report', handleShareReport);
-    return () => window.removeEventListener('saint-silas:share-report', handleShareReport);
-  }, []);
+    window.addEventListener('saint-silas:share-record', handleShareRecord);
+    return () => window.removeEventListener('saint-silas:share-record', handleShareRecord);
+  }, [activeTab]);
 
   const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -850,8 +850,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
           {activeTab === 'ask-feedback' && (
             <AskFeedbackTab
-             initialReport={feedbackDraft}
-             onInitialReportConsumed={clearFeedbackDraft}
              onOpenConversation={contactId => {
               setChatContactToOpen(contactId);
               handleTabSelect('chat');
@@ -881,6 +879,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           <ChatTab
             initialContactId={chatContactToOpen}
             onInitialContactOpened={() => setChatContactToOpen('')}
+            initialShareDraft={shareDraft}
+            onInitialShareDraftConsumed={clearShareDraft}
             onExitFullScreen={() => handleTabSelect(lastDashboardTab)}
           />
         </div>

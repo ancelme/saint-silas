@@ -15,6 +15,7 @@ import {
 } from '../../services/api';
 import { connectChatSocket, getChatSocket } from '../../services/chatSocket';
 import { SocialTab } from './SocialTab';
+import { AdminReportDraft } from '../common/ShareToAdminButton';
 
 function formatLastSeen(value: string | null) {
   if (!value) return 'Last seen unavailable';
@@ -73,8 +74,16 @@ function formatFileSize(bytes: number) {
 export const ChatTab: React.FC<{
   initialContactId?: string;
   onInitialContactOpened?: () => void;
+  initialShareDraft?: AdminReportDraft;
+  onInitialShareDraftConsumed?: () => void;
   onExitFullScreen: () => void;
-}> = ({ initialContactId, onInitialContactOpened, onExitFullScreen }) => {
+}> = ({
+  initialContactId,
+  onInitialContactOpened,
+  initialShareDraft,
+  onInitialShareDraftConsumed,
+  onExitFullScreen,
+}) => {
   const { user } = useAuth();
   const [contacts, setContacts] = useState<ChatContact[]>([]);
   const [selectedContactId, setSelectedContactId] = useState('');
@@ -90,6 +99,9 @@ export const ChatTab: React.FC<{
   const [isLoadingContacts, setIsLoadingContacts] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [shareDraft, setShareDraft] = useState<AdminReportDraft | null>(initialShareDraft || null);
+  const [isSendingShare, setIsSendingShare] = useState(false);
+  const [shareError, setShareError] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [isPeerTyping, setIsPeerTyping] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
@@ -114,6 +126,12 @@ export const ChatTab: React.FC<{
   const selectedContact = useMemo(
     () => contacts.find(contact => contact.id === selectedContactId) || null,
     [contacts, selectedContactId],
+  );
+  const shareRecipients = useMemo(
+    () => contacts.filter(contact =>
+      !contact.isGroup && ['admin', 'owner', 'super_admin'].includes(contact.role),
+    ),
+    [contacts],
   );
   const visibleContacts = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
@@ -162,6 +180,12 @@ export const ChatTab: React.FC<{
     setSelectedContactId(initialContactId);
     onInitialContactOpened?.();
   }, [contacts, initialContactId, onInitialContactOpened]);
+
+  useEffect(() => {
+    if (!initialShareDraft) return;
+    setShareDraft(initialShareDraft);
+    setShareError('');
+  }, [initialShareDraft]);
 
   useEffect(() => {
     if (!selectedContactId) {
@@ -497,6 +521,35 @@ export const ChatTab: React.FC<{
       setError(sendError instanceof Error ? sendError.message : 'Message could not be sent.');
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleShareRecord = async (contact: ChatContact) => {
+    if (
+      !shareDraft ||
+      !shareRecipients.some(recipient => recipient.id === contact.id) ||
+      isSendingShare
+    ) return;
+
+    setIsSendingShare(true);
+    setShareError('');
+    try {
+      const result = await sendDirectMessage(
+        contact.id,
+        shareDraft.body,
+        `Report: ${shareDraft.subject}`.slice(0, 120),
+      );
+      setSelectedContactId(contact.id);
+      setMessages([result.message]);
+      setContacts(current => current.map(item =>
+        item.id === contact.id ? { ...item, lastMessage: shareDraft.body } : item,
+      ));
+      setShareDraft(null);
+      onInitialShareDraftConsumed?.();
+    } catch (sendError) {
+      setShareError(sendError instanceof Error ? sendError.message : 'The report could not be shared.');
+    } finally {
+      setIsSendingShare(false);
     }
   };
 
@@ -963,6 +1016,94 @@ export const ChatTab: React.FC<{
         </div>
       </div>
     </section>
+      {shareDraft && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget && !isSendingShare) {
+              setShareDraft(null);
+              onInitialShareDraftConsumed?.();
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="share-record-title"
+            className="max-h-[min(90dvh,700px)] w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-slate-900"
+          >
+            <header className="flex items-start justify-between gap-4 border-b border-slate-100 p-5 dark:border-slate-800">
+              <div>
+                <h2 id="share-record-title" className="text-lg font-bold text-slate-900 dark:text-white">Share with an administrator</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Choose an authorized recipient. The report will be sent directly in Chat.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShareDraft(null);
+                  onInitialShareDraftConsumed?.();
+                }}
+                disabled={isSendingShare}
+                aria-label="Cancel sharing"
+                className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-slate-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+            <div className="space-y-4 overflow-y-auto p-5">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                <p className="text-sm font-bold text-slate-900 dark:text-white">{shareDraft.subject}</p>
+                <p className="mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-600 dark:text-slate-300">{shareDraft.body}</p>
+              </div>
+              {shareError && (
+                <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+                  {shareError}
+                </p>
+              )}
+              {isLoadingContacts ? (
+                <div className="space-y-2" aria-label="Loading authorized recipients">
+                  {[0, 1, 2].map(item => (
+                    <div key={item} className="h-16 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+                  ))}
+                </div>
+              ) : shareRecipients.length ? (
+                <ul className="max-h-64 space-y-2 overflow-y-auto" aria-label="Authorized recipients">
+                  {shareRecipients.map(contact => (
+                    <li key={contact.id}>
+                      <button
+                        type="button"
+                        onClick={() => void handleShareRecord(contact)}
+                        disabled={isSendingShare}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50/60 disabled:cursor-wait disabled:opacity-60 dark:border-slate-700 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/30"
+                      >
+                        {contact.avatar ? (
+                          <img src={contact.avatar} alt="" className="h-11 w-11 rounded-full object-cover" />
+                        ) : (
+                          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                            <UserRound className="h-5 w-5" />
+                          </span>
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-bold text-slate-900 dark:text-white">{contact.fullName}</span>
+                          <span className="block text-xs capitalize text-slate-500 dark:text-slate-400">{contact.role.replace('_', ' ')}</span>
+                        </span>
+                        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white">
+                          {isSendingShare ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                          {isSendingShare ? 'Sending' : 'Share'}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                  No active administrator or owner is available to receive this report.
+                </p>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
       {showGroupModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" onMouseDown={event => {
           if (event.target === event.currentTarget) setShowGroupModal(false);
