@@ -35,6 +35,10 @@ export interface AuthRequest extends Request {
   user?: AuthenticatedUser;
 }
 
+export function isTeacherInactive(user: { role?: string; teacher_status?: string }): boolean {
+  return user.role === 'teacher' && user.teacher_status?.toLowerCase() === 'inactive';
+}
+
 export function generateToken(payload: {
   id: string;
   username: string;
@@ -81,12 +85,12 @@ export async function authenticateSocketToken(token: string): Promise<Authentica
     const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser;
     const userResult = await db.query(
       `SELECT u.id, u.username, u.email, u.full_name, u.role, u.status, u.is_active, u.must_change_password,
-              t.teacher_type
+              t.teacher_type, t.status AS teacher_status
        FROM users u LEFT JOIN teachers t ON t.user_id = u.id WHERE u.id = ?`,
       [decoded.id],
     );
     const user = userResult.rows[0];
-    if (!user || user.is_active === 0 || user.status === 'Inactive') return null;
+    if (!user || user.is_active === 0 || user.status === 'Inactive' || isTeacherInactive(user)) return null;
 
     return {
       id: user.id,
@@ -117,7 +121,7 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
     // Check if user still exists and is active in database
     const userResult = await db.query(
       `SELECT u.id, u.username, u.email, u.full_name, u.role, u.status, u.is_active, u.must_change_password,
-              t.teacher_type
+              t.teacher_type, t.status AS teacher_status
        FROM users u LEFT JOIN teachers t ON t.user_id = u.id WHERE u.id = ?`,
       [decoded.id]
     );
@@ -127,7 +131,7 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
     }
 
     const dbUser = userResult.rows[0];
-    if (dbUser.is_active === 0 || dbUser.status === 'Inactive') {
+    if (dbUser.is_active === 0 || dbUser.status === 'Inactive' || isTeacherInactive(dbUser)) {
       return res.status(403).json({ error: 'This account has been deactivated by the School Owner.' });
     }
 

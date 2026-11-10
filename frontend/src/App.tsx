@@ -74,7 +74,7 @@ const MainApp: React.FC = () => {
 
   // Auth Modal State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authModalTab, setAuthModalTab] = useState<'login' | 'signup' | 'setup'>('login');
+  const [authModalTab, setAuthModalTab] = useState<'login' | 'signup' | 'setup' | 'teacher-register'>('login');
 
   // Interactive Google Map Modal State
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
@@ -201,7 +201,7 @@ const MainApp: React.FC = () => {
       notifySuccess(`Pupil ${updatedStudent.firstName} ${updatedStudent.lastName} updated successfully.`);
     } catch (e) {
       console.error('Failed to update student via API:', e);
-      setStudents(prev => prev.map(s => (s.id === updatedStudent.id ? updatedStudent : s)));
+      throw e;
     }
   };
 
@@ -227,6 +227,10 @@ const MainApp: React.FC = () => {
       console.error('Failed to create teacher via API:', e);
       throw e;
     }
+  };
+
+  const handleTeacherApproved = (teacher: Teacher) => {
+    setTeachers(current => [teacher, ...current.filter(item => item.id !== teacher.id)]);
   };
 
   const handleUpdateTeacher = async (updatedTeacher: Teacher) => {
@@ -567,6 +571,7 @@ const MainApp: React.FC = () => {
         onUpdateStudent={handleUpdateStudent}
         onDeleteStudent={handleDeleteStudent}
         onAddTeacher={handleAddTeacher}
+        onTeacherApproved={handleTeacherApproved}
         onUpdateTeacher={handleUpdateTeacher}
         onDeleteTeacher={handleDeleteTeacher}
         onSaveAttendance={handleSaveAttendance}

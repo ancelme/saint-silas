@@ -51,8 +51,8 @@ export async function getGrades(req: AuthRequest, res: Response) {
       ))`;
       params.push(userId, userId);
     } else if (userRole === 'student') {
-      query += ` AND (LOWER(s.first_name) = LOWER(?) OR LOWER(s.admission_number) = LOWER(?))`;
-      params.push(req.user?.username || '', req.user?.username || '');
+      query += ` AND s.user_id = ?`;
+      params.push(userId);
     } else if (userRole === 'teacher') {
       query += ` AND EXISTS (
         SELECT 1 FROM teachers t
@@ -99,10 +99,6 @@ export async function updateGrade(req: AuthRequest, res: Response) {
     if (!studentId || !subject || marks === undefined) {
       return res.status(400).json({ error: 'Student ID, subject, and marks are required' });
     }
-    if (req.user?.role === 'teacher' && req.user.teacherType !== 'subject_teacher') {
-      return res.status(403).json({ error: 'Only subject teachers can record subject marks.' });
-    }
-
     const numMarks = Number(marks);
     if (!Number.isFinite(numMarks) || numMarks < 0 || numMarks > 100) {
       return res.status(400).json({ error: 'Marks must be a number between 0 and 100.' });
@@ -113,12 +109,21 @@ export async function updateGrade(req: AuthRequest, res: Response) {
     else if (numMarks >= 60) letterGrade = 'C';
     else if (numMarks >= 50) letterGrade = 'D';
 
-    // Find or create subject
-    let subRes = await db.query(`SELECT id FROM subjects WHERE LOWER(name) = LOWER(?) LIMIT 1`, [subject.trim()]);
+    const studentResult = await db.query(
+      `SELECT s.class_id, c.grade_level
+       FROM students s LEFT JOIN classes c ON c.id = s.class_id
+       WHERE s.id = ? AND s.status <> 'Archived'`,
+      [studentId],
+    );
+    const studentClass = studentResult.rows[0];
+    if (!studentClass) return res.status(404).json({ error: 'Active pupil and class were not found.' });
+
+    // Teachers can only record marks for existing subjects; administrators may add a new subject.
+    let subRes = await db.query(`SELECT id, grade_level FROM subjects WHERE LOWER(name) = LOWER(?) LIMIT 1`, [subject.trim()]);
     let subjectId = subRes.rows[0]?.id;
     if (!subjectId) {
       if (req.user?.role === 'teacher') {
-        return res.status(403).json({ error: 'Marks can only be recorded for your assigned subjects.' });
+        return res.status(403).json({ error: 'Marks can only be recorded for an existing subject assigned to your class.' });
       }
       subRes = await db.query(`SELECT id FROM subjects WHERE name LIKE ? LIMIT 1`, [`%${subject}%`]);
       subjectId = subRes.rows[0]?.id;
@@ -131,16 +136,37 @@ export async function updateGrade(req: AuthRequest, res: Response) {
     }
 
     if (req.user?.role === 'teacher') {
-      const assignment = await db.query(
-        `SELECT tsa.teacher_id
-         FROM teacher_subject_assignments tsa
-         JOIN teachers t ON t.id = tsa.teacher_id
-         JOIN students s ON s.class_id = tsa.class_id
-         WHERE t.user_id = ? AND s.id = ? AND tsa.subject_id = ?`,
-        [req.user.id, studentId, subjectId],
-      );
-      if (!assignment.rows.length) {
-        return res.status(403).json({ error: 'You can record marks only for your assigned class and subject.' });
+      if (req.user.teacherType === 'class_teacher') {
+        if (!studentClass.class_id || !studentClass.grade_level) {
+          return res.status(403).json({ error: 'You can record marks only for pupils in your assigned class.' });
+        }
+        const [classAssignment, applicableSubject] = await Promise.all([
+          db.query(
+            `SELECT c.id FROM classes c
+             JOIN teachers t ON t.id = c.class_teacher_id
+             WHERE c.id = ? AND t.user_id = ? AND t.teacher_type = 'class_teacher' AND t.status = 'Active'`,
+            [studentClass.class_id, req.user.id],
+          ),
+          db.query(
+            `SELECT id FROM subjects WHERE id = ?
+             AND (grade_level = 'All' OR LOWER(grade_level) = LOWER(?))`,
+            [subjectId, studentClass.grade_level],
+          ),
+        ]);
+        if (!classAssignment.rows.length || !applicableSubject.rows.length) {
+          return res.status(403).json({ error: 'You can record marks only for pupils and subjects in your assigned class.' });
+        }
+      } else {
+        const assignment = await db.query(
+          `SELECT tsa.teacher_id
+           FROM teacher_subject_assignments tsa
+           JOIN teachers t ON t.id = tsa.teacher_id
+           WHERE t.user_id = ? AND tsa.class_id = ? AND tsa.subject_id = ?`,
+          [req.user.id, studentClass.class_id, subjectId],
+        );
+        if (!assignment.rows.length) {
+          return res.status(403).json({ error: 'You can record marks only for your assigned class and subject.' });
+        }
       }
     }
 
@@ -224,10 +250,6 @@ export async function updateGrade(req: AuthRequest, res: Response) {
 
 export async function deleteGrade(req: AuthRequest, res: Response) {
   try {
-    if (req.user?.role === 'teacher' && req.user.teacherType !== 'subject_teacher') {
-      return res.status(403).json({ error: 'Only subject teachers can delete subject marks.' });
-    }
-
     const markResult = await db.query(
       `SELECT m.student_id, m.subject_id, s.class_id
        FROM marks m JOIN students s ON s.id = m.student_id
@@ -238,14 +260,26 @@ export async function deleteGrade(req: AuthRequest, res: Response) {
     if (!mark) return res.status(404).json({ error: 'Subject mark not found.' });
 
     if (req.user?.role === 'teacher') {
-      const assignment = await db.query(
-        `SELECT tsa.teacher_id FROM teacher_subject_assignments tsa
-         JOIN teachers t ON t.id = tsa.teacher_id
-         WHERE t.user_id = ? AND tsa.class_id = ? AND tsa.subject_id = ?`,
-        [req.user.id, mark.class_id, mark.subject_id],
-      );
-      if (!assignment.rows.length) {
-        return res.status(403).json({ error: 'You can delete marks only for your assigned class and subject.' });
+      if (req.user.teacherType === 'class_teacher') {
+        const assignment = await db.query(
+          `SELECT c.id FROM classes c
+           JOIN teachers t ON t.id = c.class_teacher_id
+           WHERE t.user_id = ? AND t.teacher_type = 'class_teacher' AND c.id = ?`,
+          [req.user.id, mark.class_id],
+        );
+        if (!assignment.rows.length) {
+          return res.status(403).json({ error: 'You can delete marks only for pupils in your assigned class.' });
+        }
+      } else {
+        const assignment = await db.query(
+          `SELECT tsa.teacher_id FROM teacher_subject_assignments tsa
+           JOIN teachers t ON t.id = tsa.teacher_id
+           WHERE t.user_id = ? AND tsa.class_id = ? AND tsa.subject_id = ?`,
+          [req.user.id, mark.class_id, mark.subject_id],
+        );
+        if (!assignment.rows.length) {
+          return res.status(403).json({ error: 'You can delete marks only for your assigned class and subject.' });
+        }
       }
     }
 

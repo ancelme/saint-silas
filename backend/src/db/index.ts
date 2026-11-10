@@ -51,6 +51,10 @@ class DatabaseManager {
 
     const connectionString = process.env.SUPABASE_DB_URL;
     if (!connectionString) {
+      if (process.env.VERCEL) {
+        throw new Error('SUPABASE_DB_URL is required on Vercel; SQLite data in /tmp is not durable.');
+      }
+
       this.databaseEngine = 'sqlite';
       const bundledDatabasePath = process.env.SQLITE_FILE_PATH
         ? path.resolve(process.env.SQLITE_FILE_PATH)
@@ -58,12 +62,7 @@ class DatabaseManager {
       if (!fs.existsSync(bundledDatabasePath)) {
         throw new Error(`SQLite database file not found: ${bundledDatabasePath}`);
       }
-      if (process.env.VERCEL) {
-        this.sqliteFilePath = path.join('/tmp', 'st_silas.sqlite');
-        fs.copyFileSync(bundledDatabasePath, this.sqliteFilePath);
-      } else {
-        this.sqliteFilePath = bundledDatabasePath;
-      }
+      this.sqliteFilePath = bundledDatabasePath;
       const SQL = await initSqlJs({
         locateFile: file => path.resolve(process.cwd(), 'node_modules', 'sql.js', 'dist', file),
       });
@@ -105,6 +104,27 @@ class DatabaseManager {
       teacher_id VARCHAR(36) NOT NULL,
       published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE (student_id, period)
+    )`);
+    await this.query(`CREATE TABLE IF NOT EXISTS class_teacher_registration_requests (
+      id VARCHAR(36) PRIMARY KEY,
+      full_name VARCHAR(150) NOT NULL,
+      email VARCHAR(191) NOT NULL,
+      username VARCHAR(100) NOT NULL,
+      password_hash VARCHAR(255) NOT NULL,
+      phone VARCHAR(50) DEFAULT '',
+      class_id VARCHAR(36) NOT NULL,
+      status VARCHAR(30) NOT NULL DEFAULT 'Pending',
+      reviewed_by VARCHAR(36),
+      reviewed_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await this.query(`CREATE TABLE IF NOT EXISTS class_announcements (
+      id VARCHAR(36) PRIMARY KEY,
+      class_id VARCHAR(36) NOT NULL,
+      teacher_id VARCHAR(36) NOT NULL,
+      title VARCHAR(200) NOT NULL,
+      content TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
     await this.query(`CREATE TABLE IF NOT EXISTS stock_items (
       id VARCHAR(36) PRIMARY KEY,
@@ -324,6 +344,27 @@ class DatabaseManager {
         phone VARCHAR(50),
         join_date DATE,
         status VARCHAR(30) DEFAULT 'Active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+      `CREATE TABLE IF NOT EXISTS class_teacher_registration_requests (
+        id VARCHAR(36) PRIMARY KEY,
+        full_name VARCHAR(150) NOT NULL,
+        email VARCHAR(191) NOT NULL,
+        username VARCHAR(100) NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        phone VARCHAR(50) DEFAULT '',
+        class_id VARCHAR(36) NOT NULL,
+        status VARCHAR(30) NOT NULL DEFAULT 'Pending',
+        reviewed_by VARCHAR(36),
+        reviewed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );`,
+      `CREATE TABLE IF NOT EXISTS class_announcements (
+        id VARCHAR(36) PRIMARY KEY,
+        class_id VARCHAR(36) NOT NULL,
+        teacher_id VARCHAR(36) NOT NULL,
+        title VARCHAR(200) NOT NULL,
+        content TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );`,
       `CREATE TABLE IF NOT EXISTS parents (
@@ -834,7 +875,8 @@ class DatabaseManager {
       'parent_students', 'enrollments', 'attendance', 'exams', 'marks', 'assignments', 'fees',
       'payments', 'expenses', 'library_books', 'borrowing_records',
       'announcements', 'messages', 'admissions', 'audit_logs', 'notifications',
-      'teacher_subject_assignments', 'student_reports'
+      'teacher_subject_assignments', 'student_reports',
+      'class_teacher_registration_requests', 'class_announcements'
     ];
 
     for (const table of tables) {

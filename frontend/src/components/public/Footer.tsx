@@ -78,7 +78,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth }) => {
               </p>
               <p className="flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>info@stsilaskibondo.rw</span>
+                <span>ndayishimiyeinnocent730@gmail.com</span>
               </p>
             </div>
 
@@ -108,7 +108,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAuth }) => {
           <p className="text-center sm:text-right leading-relaxed">
             Developed by <strong className="text-slate-400">NDAYISHIMIYE INNOCENT</strong> from Gatsibo
             <br />
-            Contact: 07283717185 / 0781811662
+            Contact: 07283717185 / 078461893
           </p>
         </div>
       </div>

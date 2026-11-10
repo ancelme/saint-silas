@@ -7,6 +7,7 @@ import {
   clearSessionCookie,
   getSessionCookieToken,
   authenticateSocketToken,
+  isTeacherInactive,
   AuthRequest,
   recordAuditLog,
 } from '../middleware/auth';
@@ -205,7 +206,7 @@ export async function login(req: Request, res: Response) {
 
     const cleanIdentifier = identifier.trim().toLowerCase();
     const userRes = await db.query(
-      `SELECT u.*, t.teacher_type
+      `SELECT u.*, t.teacher_type, t.status AS teacher_status
        FROM users u LEFT JOIN teachers t ON t.user_id = u.id
        WHERE (LOWER(u.email) = ? OR LOWER(u.username) = ?) LIMIT 1`,
       [cleanIdentifier, cleanIdentifier]
@@ -224,7 +225,7 @@ export async function login(req: Request, res: Response) {
 
     const user = userRes.rows[0];
 
-    if (user.is_active === 0 || user.status === 'Inactive') {
+    if (user.is_active === 0 || user.status === 'Inactive' || isTeacherInactive(user)) {
       await recordAuditLog({
         userId: user.id,
         userName: user.full_name,

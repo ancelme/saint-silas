@@ -62,6 +62,7 @@ export const UserManagementTab: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [formStudentId, setFormStudentId] = useState('');
   const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [teacherOptions, setTeacherOptions] = useState<TeacherAssignmentOptions | null>(null);
@@ -108,6 +109,7 @@ export const UserManagementTab: React.FC = () => {
 
   // New Role Form
   const [targetRole, setTargetRole] = useState<Role>('admin');
+  const [targetStudentId, setTargetStudentId] = useState('');
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
 
   // Toast
@@ -132,7 +134,7 @@ export const UserManagementTab: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!isCreateModalOpen || formRole !== 'parent') return;
+    if (!isCreateModalOpen || !['parent', 'student'].includes(formRole)) return;
     let isCurrent = true;
     setIsLoadingStudents(true);
     fetchStudents()
@@ -172,6 +174,27 @@ export const UserManagementTab: React.FC = () => {
       isCurrent = false;
     };
   }, [isCreateModalOpen, formRole]);
+
+  useEffect(() => {
+    if (!isRoleModalOpen || targetRole !== 'student' || selectedUser?.studentId) return;
+    let isCurrent = true;
+    setIsLoadingStudents(true);
+    fetchStudents()
+      .then(items => {
+        if (isCurrent) setStudents(items);
+      })
+      .catch(error => {
+        if (isCurrent) {
+          setToastMsg({ type: 'error', text: error.message || 'Failed to load students for account linking' });
+        }
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoadingStudents(false);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [isRoleModalOpen, selectedUser?.studentId, targetRole]);
 
   const handleGeneratePassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$';
@@ -220,6 +243,10 @@ export const UserManagementTab: React.FC = () => {
       setToastMsg({ type: 'error', text: 'Select at least one student for this parent account' });
       return;
     }
+    if (formRole === 'student' && !formStudentId) {
+      setToastMsg({ type: 'error', text: 'Select the student record for this account' });
+      return;
+    }
     if (formRole === 'teacher' && formTeacherType === 'class_teacher' && !formClassIds.length) {
       setToastMsg({ type: 'error', text: 'Select at least one class for this class teacher' });
       return;
@@ -248,6 +275,7 @@ export const UserManagementTab: React.FC = () => {
         phone: formPhone,
         avatar: formAvatar,
         studentIds: formRole === 'parent' ? selectedStudentIds : undefined,
+        studentId: formRole === 'student' ? formStudentId : undefined,
         teacherType: formRole === 'teacher' ? formTeacherType : undefined,
         classIds: formRole === 'teacher' && formTeacherType === 'class_teacher' ? formClassIds : [],
         subjectAssignments: formRole === 'teacher' && formTeacherType === 'subject_teacher'
@@ -270,6 +298,7 @@ export const UserManagementTab: React.FC = () => {
       setFormAvatar('');
       setFormAvatarFileName('');
       setSelectedStudentIds([]);
+      setFormStudentId('');
       setFormClassIds([]);
       setFormSubjectAssignments([{ classId: '', subjectId: '' }]);
       loadUsers();
@@ -347,12 +376,17 @@ export const UserManagementTab: React.FC = () => {
   const handleRoleChangeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
+    if (targetRole === 'student' && !selectedUser.studentId && !targetStudentId) {
+      setToastMsg({ type: 'error', text: 'Select a student record to link to this account' });
+      return;
+    }
 
     setIsUpdatingRole(true);
     try {
-      const res = await updateUserRole(selectedUser.id, targetRole);
+      const res = await updateUserRole(selectedUser.id, targetRole, targetStudentId || undefined);
       setToastMsg({ type: 'success', text: res.message });
       setIsRoleModalOpen(false);
+      setTargetStudentId('');
       loadUsers();
     } catch (err: any) {
       setToastMsg({ type: 'error', text: err.message || 'Failed to update role' });
@@ -672,6 +706,7 @@ export const UserManagementTab: React.FC = () => {
                               onClick={() => {
                                 setSelectedUser(user);
                                 setTargetRole(user.role);
+                                setTargetStudentId('');
                                 setIsRoleModalOpen(true);
                               }}
                               className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-emerald-500 text-slate-600 hover:text-emerald-600 transition-colors cursor-pointer"
@@ -780,7 +815,10 @@ export const UserManagementTab: React.FC = () => {
                     <button
                       key={r.role}
                       type="button"
-                      onClick={() => setFormRole(r.role)}
+                      onClick={() => {
+                        setFormRole(r.role);
+                        setFormStudentId('');
+                      }}
                       className={`flex min-h-[72px] items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                         formRole === r.role
                           ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 shadow-xs'
@@ -970,6 +1008,37 @@ export const UserManagementTab: React.FC = () => {
                         </div>
                       )}
                     </div>
+                  )}
+                </fieldset>
+              )}
+
+              {formRole === 'student' && (
+                <fieldset className="rounded-2xl border border-cyan-200 bg-cyan-50/50 p-3 dark:border-cyan-900 dark:bg-cyan-950/20">
+                  <legend className="px-1 font-bold text-slate-700 dark:text-slate-200">Link this account to a student record</legend>
+                  <p className="mb-2 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">
+                    The student can only view records belonging to the selected pupil.
+                  </p>
+                  {isLoadingStudents ? (
+                    <div className="flex items-center gap-2 py-3 text-slate-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading active students…
+                    </div>
+                  ) : students.filter(student => !student.hasUserAccount).length === 0 ? (
+                    <p className="py-3 text-amber-700 dark:text-amber-300">No active students without an account are available.</p>
+                  ) : (
+                    <select
+                      required
+                      value={formStudentId}
+                      onChange={event => setFormStudentId(event.target.value)}
+                      className="w-full rounded-xl border border-cyan-200 bg-white px-3 py-2.5 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                    >
+                      <option value="">Select a student</option>
+                      {students.filter(student => !student.hasUserAccount).map(student => (
+                        <option key={student.id} value={student.id}>
+                          {student.firstName} {student.lastName} · {student.grade} · {student.rollNo}
+                        </option>
+                      ))}
+                    </select>
                   )}
                 </fieldset>
               )}
@@ -1326,7 +1395,10 @@ export const UserManagementTab: React.FC = () => {
                 <label className="block text-slate-600 dark:text-slate-300 font-bold mb-1">Select New Staff Role</label>
                 <select
                   value={targetRole}
-                  onChange={e => setTargetRole(e.target.value as Role)}
+                  onChange={e => {
+                    setTargetRole(e.target.value as Role);
+                    setTargetStudentId('');
+                  }}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium"
                 >
                   {ALL_ASSIGNABLE_ROLES.map((r: { role: Role; label: string }) => (
@@ -1334,6 +1406,35 @@ export const UserManagementTab: React.FC = () => {
                   ))}
                 </select>
               </div>
+
+              {targetRole === 'student' && !selectedUser.studentId && (
+                <div>
+                  <label className="mb-1 block font-bold text-slate-600 dark:text-slate-300">Student record to link</label>
+                  {isLoadingStudents ? (
+                    <div className="flex items-center gap-2 py-2 text-slate-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading active students…
+                    </div>
+                  ) : (
+                    <select
+                      required
+                      value={targetStudentId}
+                      onChange={e => setTargetStudentId(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 font-medium text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    >
+                      <option value="">Select a student without an account</option>
+                      {students.filter(student => !student.hasUserAccount).map(student => (
+                        <option key={student.id} value={student.id}>
+                          {student.firstName} {student.lastName} · {student.grade} · {student.rollNo}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {!isLoadingStudents && !students.some(student => !student.hasUserAccount) && (
+                    <p className="mt-1 text-[10px] text-amber-700 dark:text-amber-300">No unlinked active student records are available.</p>
+                  )}
+                </div>
+              )}
 
               <div className="pt-2 flex justify-end gap-2">
                 <button

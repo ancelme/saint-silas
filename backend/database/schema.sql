@@ -122,6 +122,29 @@ CREATE TABLE IF NOT EXISTS teachers (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS class_teacher_registration_requests (
+  id VARCHAR(36) PRIMARY KEY,
+  full_name VARCHAR(150) NOT NULL,
+  email VARCHAR(191) NOT NULL,
+  username VARCHAR(100) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  phone VARCHAR(50) DEFAULT '',
+  class_id VARCHAR(36) NOT NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'Pending',
+  reviewed_by VARCHAR(36),
+  reviewed_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS class_announcements (
+  id VARCHAR(36) PRIMARY KEY,
+  class_id VARCHAR(36) NOT NULL,
+  teacher_id VARCHAR(36) NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS teacher_subject_assignments (
   id VARCHAR(36) PRIMARY KEY,
   teacher_id VARCHAR(36) NOT NULL,

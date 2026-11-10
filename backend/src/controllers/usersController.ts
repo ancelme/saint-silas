@@ -11,10 +11,11 @@ const PRIVILEGED_STAFF_ROLES = ['admin', 'head_teacher', 'teacher', 'accountant'
 export async function getUsers(req: AuthRequest, res: Response) {
   try {
     const result = await db.query(
-      `SELECT id, username, email, full_name, role, phone, avatar_url, status, must_change_password,
-              recovery_email, recovery_phone, last_login, created_at, is_active
-       FROM users
-       ORDER BY created_at DESC`
+      `SELECT u.id, u.username, u.email, u.full_name, u.role, u.phone, u.avatar_url, u.status, u.must_change_password,
+              u.recovery_email, u.recovery_phone, u.last_login, u.created_at, u.is_active, s.id AS student_id
+       FROM users u
+       LEFT JOIN students s ON s.user_id = u.id
+       ORDER BY u.created_at DESC`
     );
 
     const users = result.rows.map(u => ({
@@ -31,6 +32,7 @@ export async function getUsers(req: AuthRequest, res: Response) {
       recoveryPhone: u.recovery_phone || '',
       lastLogin: u.last_login ? String(u.last_login).replace('T', ' ').substring(0, 19) : null,
       createdAt: u.created_at ? String(u.created_at).replace('T', ' ').substring(0, 10) : '',
+      studentId: u.student_id || undefined,
     }));
 
     return res.json(users);
@@ -44,7 +46,7 @@ export async function createStaffUser(req: AuthRequest, res: Response) {
   try {
     const {
       fullName, email, username, password, role, phone, specialization, department, avatar, studentIds,
-      teacherType, classIds, subjectAssignments,
+      studentId, teacherType, classIds, subjectAssignments,
     } = req.body;
 
     if (!fullName || !email || !username || !password || !role) {
@@ -123,6 +125,23 @@ export async function createStaffUser(req: AuthRequest, res: Response) {
     const linkedStudentIds = Array.isArray(studentIds)
       ? [...new Set(studentIds.filter((id: unknown): id is string => typeof id === 'string' && id.trim().length > 0).map((id: string) => id.trim()))]
       : [];
+    let linkedStudentId: string | null = null;
+    if (role === 'student') {
+      linkedStudentId = typeof studentId === 'string' ? studentId.trim() : '';
+      if (!linkedStudentId) {
+        return res.status(400).json({ error: 'Select the student record for this account.' });
+      }
+      const studentResult = await db.query(
+        `SELECT id, user_id FROM students WHERE id = ? AND status <> 'Archived'`,
+        [linkedStudentId],
+      );
+      if (!studentResult.rows.length) {
+        return res.status(400).json({ error: 'The selected student record is unavailable.' });
+      }
+      if (studentResult.rows[0].user_id) {
+        return res.status(409).json({ error: 'The selected student already has a linked account.' });
+      }
+    }
     if (role === 'parent') {
       if (linkedStudentIds.length === 0 || linkedStudentIds.length > 20) {
         return res.status(400).json({ error: 'Select between 1 and 20 students for a parent account' });
@@ -212,6 +231,15 @@ export async function createStaffUser(req: AuthRequest, res: Response) {
           [parentId, studentId],
         );
       }
+    } else if (role === 'student' && linkedStudentId) {
+      const linkResult = await db.query(
+        `UPDATE students SET user_id = ? WHERE id = ? AND user_id IS NULL AND status <> 'Archived'`,
+        [userId, linkedStudentId],
+      );
+      if (linkResult.affectedRows !== 1) {
+        await db.query(`DELETE FROM users WHERE id = ?`, [userId]);
+        return res.status(409).json({ error: 'The selected student already has a linked account. Refresh and choose another student.' });
+      }
     }
 
     // Record Security Audit Log
@@ -258,6 +286,13 @@ export async function updateUser(req: AuthRequest, res: Response) {
     // Prevent changing owner role or deactivating owner
     if ((targetUser.rows[0].role === 'owner' || targetUser.rows[0].role === 'super_admin') && (role && role !== 'owner' || status === 'Inactive')) {
       return res.status(403).json({ error: 'Cannot downgrade or deactivate the Super Admin / Owner account.' });
+    }
+
+    if (role === 'student') {
+      const studentLink = await db.query(`SELECT id FROM students WHERE user_id = ? LIMIT 1`, [id]);
+      if (!studentLink.rows.length) {
+        return res.status(400).json({ error: 'Link this account to a student record before assigning the student role.' });
+      }
     }
 
     const isActiveVal = status === 'Inactive' ? 0 : 1;
@@ -343,7 +378,7 @@ export async function updateUserStatus(req: AuthRequest, res: Response) {
 export async function updateUserRole(req: AuthRequest, res: Response) {
   try {
     const { id } = req.params;
-    const { role } = req.body;
+    const { role, studentId } = req.body;
 
     if (!PRIVILEGED_STAFF_ROLES.includes(role)) {
       return res.status(400).json({
@@ -358,6 +393,29 @@ export async function updateUserRole(req: AuthRequest, res: Response) {
 
     if (targetUser.rows[0].role === 'owner' || targetUser.rows[0].role === 'super_admin') {
       return res.status(403).json({ error: 'Cannot modify role of the primary Super Admin / Owner.' });
+    }
+
+    if (role === 'student') {
+      const studentLink = await db.query(`SELECT id FROM students WHERE user_id = ? LIMIT 1`, [id]);
+      if (!studentLink.rows.length) {
+        if (typeof studentId !== 'string' || !studentId.trim()) {
+          return res.status(400).json({ error: 'Select the student record to link before assigning the student role.' });
+        }
+        const studentResult = await db.query(
+          `SELECT id FROM students WHERE id = ? AND status <> 'Archived' AND user_id IS NULL`,
+          [studentId.trim()],
+        );
+        if (!studentResult.rows.length) {
+          return res.status(409).json({ error: 'The selected student is unavailable or already linked to an account.' });
+        }
+        const linkResult = await db.query(
+          `UPDATE students SET user_id = ? WHERE id = ? AND user_id IS NULL AND status <> 'Archived'`,
+          [id, studentId.trim()],
+        );
+        if (linkResult.affectedRows !== 1) {
+          return res.status(409).json({ error: 'The selected student was just linked to another account. Refresh and try again.' });
+        }
+      }
     }
 
     await db.query(`UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [role, id]);

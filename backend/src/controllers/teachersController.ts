@@ -1,4 +1,5 @@
-import { Response } from 'express';
+import { randomUUID } from 'crypto';
+import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { createHash } from 'crypto';
 import { db } from '../db/index';
@@ -106,7 +107,7 @@ export async function getTeacherAssignmentOptions(_req: AuthRequest, res: Respon
       const teacher = teacherResult.rows[0];
       if (!teacher) return res.status(404).json({ error: 'Teacher account was not found.' });
 
-      const [classAssignments, subjectAssignments] = await Promise.all([
+      const [classAssignments, subjectAssignments, classTeacherSubjects] = await Promise.all([
         db.query(
           `SELECT c.id AS class_id, c.name AS class_name
            FROM classes c WHERE c.class_teacher_id = ? ORDER BY c.name`,
@@ -120,6 +121,13 @@ export async function getTeacherAssignmentOptions(_req: AuthRequest, res: Respon
            WHERE tsa.teacher_id = ? ORDER BY c.name, sub.name`,
           [teacher.id],
         ),
+        db.query(
+          `SELECT c.id AS class_id, c.name AS class_name, sub.id AS subject_id, sub.name AS subject_name
+           FROM classes c
+           JOIN subjects sub ON sub.grade_level = 'All' OR LOWER(sub.grade_level) = LOWER(c.grade_level)
+           WHERE c.class_teacher_id = ? ORDER BY c.name, sub.name`,
+          [teacher.id],
+        ),
       ]);
 
       return res.json({
@@ -128,7 +136,7 @@ export async function getTeacherAssignmentOptions(_req: AuthRequest, res: Respon
           classId: row.class_id,
           className: row.class_name,
         })),
-        subjectAssignments: subjectAssignments.rows.map(row => ({
+        subjectAssignments: (teacher.teacher_type === 'class_teacher' ? classTeacherSubjects.rows : subjectAssignments.rows).map(row => ({
           classId: row.class_id,
           className: row.class_name,
           subjectId: row.subject_id,
@@ -140,6 +148,306 @@ export async function getTeacherAssignmentOptions(_req: AuthRequest, res: Respon
       return res.status(500).json({ error: error.message || 'Failed to load teacher assignments' });
     }
   }
+
+export async function getClassTeacherRegistrationOptions(_req: Request, res: Response) {
+  try {
+    const result = await db.query(
+      `SELECT id, name FROM classes WHERE class_teacher_id IS NULL ORDER BY name`,
+    );
+    return res.json(result.rows.map(row => ({ id: row.id, name: row.name })));
+  } catch (error: any) {
+    console.error('Error loading class-teacher registration options:', error);
+    return res.status(500).json({ error: error.message || 'Could not load available classes.' });
+  }
+}
+
+export async function submitClassTeacherRegistration(req: Request, res: Response) {
+  try {
+    const { fullName, email, username, password, phone, classId } = req.body || {};
+    const cleanFullName = typeof fullName === 'string' ? fullName.trim() : '';
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const cleanUsername = typeof username === 'string' ? username.trim().toLowerCase() : '';
+
+    if (!cleanFullName || !cleanEmail || !cleanUsername || !classId || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Name, email, username, password, and requested class are required.' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return res.status(400).json({ error: 'Enter a valid email address.' });
+    }
+    if (!/^[a-z0-9._-]{3,50}$/i.test(cleanUsername)) {
+      return res.status(400).json({ error: 'Username must contain 3-50 letters, numbers, dots, underscores, or hyphens.' });
+    }
+    if (password.length < 8 || password.length > 128) {
+      return res.status(400).json({ error: 'Password must be between 8 and 128 characters.' });
+    }
+    if (typeof classId !== 'string') {
+      return res.status(400).json({ error: 'Select an available class.' });
+    }
+
+    const classResult = await db.query(
+      `SELECT id FROM classes WHERE id = ? AND class_teacher_id IS NULL`,
+      [classId],
+    );
+    if (!classResult.rows.length) {
+      return res.status(409).json({ error: 'That class is no longer available. Choose another class.' });
+    }
+
+    const existingAccount = await db.query(
+      `SELECT id FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1`,
+      [cleanEmail, cleanUsername],
+    );
+    const existingRequest = await db.query(
+      `SELECT id FROM class_teacher_registration_requests
+       WHERE status = 'Pending' AND (LOWER(email) = ? OR LOWER(username) = ?) LIMIT 1`,
+      [cleanEmail, cleanUsername],
+    );
+    if (existingAccount.rows.length || existingRequest.rows.length) {
+      return res.status(409).json({ error: 'An account or pending teacher request already uses that email or username.' });
+    }
+
+    const id = randomUUID();
+    const passwordHash = await bcrypt.hash(password, 12);
+    await db.query(
+      `INSERT INTO class_teacher_registration_requests
+       (id, full_name, email, username, password_hash, phone, class_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, cleanFullName, cleanEmail, cleanUsername, passwordHash, typeof phone === 'string' ? phone.trim().slice(0, 50) : '', classId],
+    );
+    return res.status(201).json({
+      message: 'Your class-teacher request has been submitted. An administrator must approve your class before you can sign in.',
+    });
+  } catch (error: any) {
+    console.error('Error submitting class-teacher registration:', error);
+    return res.status(500).json({ error: error.message || 'Could not submit teacher registration.' });
+  }
+}
+
+export async function getClassTeacherRegistrationRequests(_req: AuthRequest, res: Response) {
+  try {
+    const result = await db.query(
+      `SELECT r.id, r.full_name, r.email, r.username, r.phone, r.status, r.created_at,
+              c.id AS class_id, c.name AS class_name
+       FROM class_teacher_registration_requests r
+       JOIN classes c ON c.id = r.class_id
+       WHERE r.status = 'Pending'
+       ORDER BY r.created_at ASC`,
+    );
+    return res.json(result.rows.map(row => ({
+      id: row.id,
+      fullName: row.full_name,
+      email: row.email,
+      username: row.username,
+      phone: row.phone || '',
+      status: row.status,
+      createdAt: row.created_at,
+      classId: row.class_id,
+      className: row.class_name,
+    })));
+  } catch (error: any) {
+    console.error('Error loading class-teacher registration requests:', error);
+    return res.status(500).json({ error: error.message || 'Could not load teacher requests.' });
+  }
+}
+
+export async function reviewClassTeacherRegistration(req: AuthRequest, res: Response) {
+  const { decision } = req.body || {};
+  if (decision !== 'approve' && decision !== 'reject') {
+    return res.status(400).json({ error: 'Choose approve or reject.' });
+  }
+
+  try {
+    const requestResult = await db.query(
+      `SELECT r.*, c.name AS class_name
+       FROM class_teacher_registration_requests r
+       JOIN classes c ON c.id = r.class_id
+       WHERE r.id = ? AND r.status = 'Pending'`,
+      [req.params.id],
+    );
+    const registration = requestResult.rows[0];
+    if (!registration) return res.status(404).json({ error: 'Pending teacher request was not found.' });
+
+    if (decision === 'reject') {
+      await db.query(
+        `UPDATE class_teacher_registration_requests
+         SET status = 'Rejected', password_hash = '', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND status = 'Pending'`,
+        [req.user?.id || null, registration.id],
+      );
+      const rejected = await db.query(
+        `SELECT id FROM class_teacher_registration_requests WHERE id = ? AND status = 'Rejected'`,
+        [registration.id],
+      );
+      if (!rejected.rows.length) return res.status(409).json({ error: 'The request was already reviewed.' });
+      return res.json({ message: 'Teacher registration request rejected.' });
+    }
+
+    const existingAccount = await db.query(
+      `SELECT id FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1`,
+      [registration.email, registration.username],
+    );
+    if (existingAccount.rows.length) {
+      return res.status(409).json({ error: 'This email or username is already in use. Resolve the duplicate before approving.' });
+    }
+
+    const teacherId = `tch-${registration.id}`;
+    const userId = `usr-${registration.id}`;
+    const employeeId = `ST-TCH-${registration.id.replace(/-/g, '').slice(-8).toUpperCase()}`;
+    await db.query(
+      `UPDATE classes SET class_teacher_id = ? WHERE id = ? AND class_teacher_id IS NULL`,
+      [teacherId, registration.class_id],
+    );
+    const claimedClass = await db.query(
+      `SELECT id FROM classes WHERE id = ? AND class_teacher_id = ?`,
+      [registration.class_id, teacherId],
+    );
+    if (!claimedClass.rows.length) {
+      return res.status(409).json({ error: 'That class has already been assigned. Reject this request and ask the teacher to choose another.' });
+    }
+
+    try {
+      await db.query(
+        `INSERT INTO users
+         (id, username, email, password_hash, full_name, role, phone, status, is_active, email_verified)
+         VALUES (?, ?, ?, ?, ?, 'teacher', ?, 'Active', 1, 1)`,
+        [userId, registration.username, registration.email, registration.password_hash, registration.full_name, registration.phone || ''],
+      );
+      await db.query(
+        `INSERT INTO teachers
+         (id, user_id, employee_id, specialization, qualification, phone, join_date, status, teacher_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', 'class_teacher')`,
+        [teacherId, userId, employeeId, 'Class Teacher', 'Primary Education', registration.phone || '', new Date().toISOString().slice(0, 10)],
+      );
+      await db.query(
+        `UPDATE class_teacher_registration_requests
+         SET status = 'Approved', password_hash = '', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND status = 'Pending'`,
+        [req.user?.id || null, registration.id],
+      );
+      const completed = await db.query(
+        `SELECT id FROM class_teacher_registration_requests WHERE id = ? AND status = 'Approved'`,
+        [registration.id],
+      );
+      if (!completed.rows.length) throw new Error('The request was already reviewed.');
+    } catch (error) {
+      await db.query(`UPDATE classes SET class_teacher_id = NULL WHERE id = ? AND class_teacher_id = ?`, [registration.class_id, teacherId]);
+      await db.query(`DELETE FROM teachers WHERE id = ?`, [teacherId]);
+      await db.query(`DELETE FROM users WHERE id = ?`, [userId]);
+      throw error;
+    }
+
+    await recordAuditLog({
+      userId: req.user?.id,
+      userName: req.user?.fullName || 'Administrator',
+      role: req.user?.role || 'admin',
+      action: 'TEACHER_REGISTRATION_APPROVED',
+      details: `Approved class-teacher registration for ${registration.full_name} to ${registration.class_id}.`,
+      ipAddress: req.ip,
+    });
+    return res.json({
+      message: 'Teacher registration approved. The teacher can now sign in to the assigned class.',
+      teacher: {
+        id: teacherId,
+        userId,
+        employeeId,
+        teacherType: 'class_teacher',
+        name: registration.full_name,
+        email: registration.email,
+        phone: registration.phone || '',
+        specialization: 'Class Teacher',
+        qualification: 'Primary Education',
+        assignedClassIds: [registration.class_id],
+        assignedClasses: [registration.class_name || 'Assigned class'],
+        assignedSubjects: [],
+        subjects: [],
+        avatar: '',
+        joinDate: new Date().toISOString().slice(0, 10),
+        status: 'Active',
+      },
+    });
+  } catch (error: any) {
+    console.error('Error reviewing class-teacher registration:', error);
+    return res.status(500).json({ error: error.message || 'Could not review teacher registration.' });
+  }
+}
+
+export async function getClassAnnouncements(req: AuthRequest, res: Response) {
+  try {
+    const result = await db.query(
+      `SELECT a.id, a.class_id, c.name AS class_name, a.title, a.content, a.created_at
+       FROM class_announcements a
+       JOIN classes c ON c.id = a.class_id
+       JOIN teachers t ON t.id = a.teacher_id
+       WHERE t.user_id = ? ORDER BY a.created_at DESC LIMIT 50`,
+      [req.user?.id],
+    );
+    return res.json(result.rows.map(row => ({
+      id: row.id,
+      classId: row.class_id,
+      className: row.class_name,
+      title: row.title,
+      content: row.content,
+      createdAt: row.created_at,
+    })));
+  } catch (error: any) {
+    console.error('Error loading class announcements:', error);
+    return res.status(500).json({ error: error.message || 'Could not load class announcements.' });
+  }
+}
+
+export async function createClassAnnouncement(req: AuthRequest, res: Response) {
+  try {
+    const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+    const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+    const classId = typeof req.body?.classId === 'string' ? req.body.classId : '';
+    if (!title || title.length > 200 || !content || content.length > 2000 || !classId) {
+      return res.status(400).json({ error: 'Choose a class and provide a title (max 200 characters) and message (max 2,000 characters).' });
+    }
+
+    const assignment = await db.query(
+      `SELECT c.id, c.name, t.id AS teacher_id
+       FROM classes c JOIN teachers t ON c.class_teacher_id = t.id
+       WHERE c.id = ? AND t.user_id = ? AND t.teacher_type = 'class_teacher' AND t.status = 'Active'`,
+      [classId, req.user?.id],
+    );
+    const classroom = assignment.rows[0];
+    if (!classroom) return res.status(403).json({ error: 'You can post updates only to your assigned class.' });
+
+    const id = randomUUID();
+    await db.query(
+      `INSERT INTO class_announcements (id, class_id, teacher_id, title, content)
+       VALUES (?, ?, ?, ?, ?)`,
+      [id, classId, classroom.teacher_id, title, content],
+    );
+
+    const recipients = await db.query(
+      `SELECT DISTINCT user_id FROM (
+         SELECT p.user_id FROM students s JOIN parents p ON s.parent_id = p.id WHERE s.class_id = ? AND p.user_id IS NOT NULL
+         UNION
+         SELECT p.user_id FROM students s
+         JOIN parent_students ps ON ps.student_id = s.id
+         JOIN parents p ON p.id = ps.parent_id
+         WHERE s.class_id = ? AND p.user_id IS NOT NULL
+       )`,
+      [classId, classId],
+    );
+    for (const recipient of recipients.rows) {
+      const notificationId = `ntf-${createHash('sha256').update(`${id}:${recipient.user_id}`).digest('hex').slice(0, 32)}`;
+      await db.query(
+        `INSERT INTO notifications (id, user_id, title, message, type)
+         VALUES (?, ?, ?, ?, 'info') ON CONFLICT (id) DO NOTHING`,
+        [notificationId, recipient.user_id, `Class update: ${title}`, content],
+      );
+    }
+
+    return res.status(201).json({
+      message: 'Class update posted and linked parents were notified.',
+      announcement: { id, classId, className: classroom.name, title, content, createdAt: new Date().toISOString() },
+    });
+  } catch (error: any) {
+    console.error('Error creating class announcement:', error);
+    return res.status(500).json({ error: error.message || 'Could not post class update.' });
+  }
+}
 
   export async function updateTeacherAssignments(req: AuthRequest, res: Response) {
     const { teacherType, classIds, subjectAssignments } = req.body || {};

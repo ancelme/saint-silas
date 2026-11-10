@@ -250,6 +250,26 @@ export async function registerApplicant(payload: {
   return data;
 }
 
+export interface ClassTeacherRegistration {
+  fullName: string;
+  email: string;
+  username: string;
+  password: string;
+  phone?: string;
+  classId: string;
+}
+
+export async function fetchClassTeacherRegistrationOptions() {
+  return request<{ id: string; name: string }[]>('/api/teachers/registration-options');
+}
+
+export async function submitClassTeacherRegistration(payload: ClassTeacherRegistration) {
+  return request<{ message: string }>('/api/teachers/register', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function completeFirstLogin(payload: {
   currentPassword: string;
   newPassword: string;
@@ -362,6 +382,7 @@ export async function createStaffUser(payload: {
   department?: string;
   avatar: string;
   studentIds?: string[];
+  studentId?: string;
   teacherType?: 'class_teacher' | 'subject_teacher';
   classIds?: string[];
   subjectAssignments?: { classId: string; subjectId: string }[];
@@ -386,10 +407,10 @@ export async function updateUserStatus(userId: string, status: 'Active' | 'Inact
   });
 }
 
-export async function updateUserRole(userId: string, role: Role) {
+export async function updateUserRole(userId: string, role: Role, studentId?: string) {
   return request<{ message: string }>(`/api/users/${userId}/role`, {
     method: 'PUT',
-    body: JSON.stringify({ role }),
+    body: JSON.stringify({ role, studentId }),
   });
 }
 
@@ -455,6 +476,49 @@ export interface TeacherAssignmentOptions {
 
 export async function fetchTeacherAssignmentOptions() {
   return request<TeacherAssignmentOptions>('/api/teachers/assignment-options');
+}
+
+export interface ClassTeacherRegistrationRequest {
+  id: string;
+  fullName: string;
+  email: string;
+  username: string;
+  phone: string;
+  status: string;
+  createdAt: string;
+  classId: string;
+  className: string;
+}
+
+export async function fetchClassTeacherRegistrationRequests() {
+  return request<ClassTeacherRegistrationRequest[]>('/api/teachers/registration-requests');
+}
+
+export async function reviewClassTeacherRegistration(id: string, decision: 'approve' | 'reject') {
+  return request<{ message: string; teacher?: Teacher }>(`/api/teachers/registration-requests/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ decision }),
+  });
+}
+
+export interface ClassAnnouncement {
+  id: string;
+  classId: string;
+  className: string;
+  title: string;
+  content: string;
+  createdAt: string;
+}
+
+export async function fetchClassAnnouncements() {
+  return request<ClassAnnouncement[]>('/api/teachers/class-announcements');
+}
+
+export async function createClassAnnouncement(payload: Pick<ClassAnnouncement, 'classId' | 'title' | 'content'>) {
+  return request<{ message: string; announcement: ClassAnnouncement }>('/api/teachers/class-announcements', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 
 export interface MyTeacherAssignments {

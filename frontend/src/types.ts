@@ -46,6 +46,7 @@ export interface User {
 
 export interface Student {
   id: string;
+  hasUserAccount?: boolean;
   name?: string;
   admissionNo?: string;
   classId?: string;

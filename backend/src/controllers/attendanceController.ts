@@ -53,8 +53,8 @@ export async function getAttendance(req: AuthRequest, res: Response) {
       ))`;
       params.push(userId, userId);
     } else if (userRole === 'student') {
-      query += ` AND (LOWER(s.first_name) = LOWER(?) OR LOWER(s.admission_number) = LOWER(?))`;
-      params.push(req.user?.username || '', req.user?.username || '');
+      query += ` AND s.user_id = ?`;
+      params.push(userId);
     } else if (userRole === 'teacher') {
       if (req.user?.teacherType === 'class_teacher') {
         query += ` AND a.subject_id IS NULL AND EXISTS (

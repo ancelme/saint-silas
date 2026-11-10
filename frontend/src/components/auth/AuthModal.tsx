@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
+import { fetchClassTeacherRegistrationOptions, submitClassTeacherRegistration } from '../../services/api';
 import {
   GraduationCap,
   Eye,
@@ -23,7 +24,7 @@ import {
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'login' | 'signup' | 'setup';
+  initialTab?: 'login' | 'signup' | 'setup' | 'teacher-register';
   onSuccess: () => void;
 }
 
@@ -36,7 +37,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const { t } = useLanguage();
   const { login, setupOwner, registerPublicApplicant, isOwnerConfigured, defaultOwnerUsername } = useAuth();
 
-  const [tab, setTab] = useState<'login' | 'signup' | 'setup'>(initialTab);
+  const [tab, setTab] = useState<'login' | 'signup' | 'setup' | 'teacher-register'>(initialTab);
 
   // Form Fields
   const [identifier, setIdentifier] = useState('');
@@ -47,6 +48,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [phone, setPhone] = useState('');
   const [ownerAvatar, setOwnerAvatar] = useState('');
   const [ownerAvatarName, setOwnerAvatarName] = useState('');
+  const [classOptions, setClassOptions] = useState<{ id: string; name: string }[]>([]);
+  const [requestedClassId, setRequestedClassId] = useState('');
 
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,6 +65,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
     setTab(initialTab);
   }, [defaultOwnerUsername, initialTab, isOpen, isOwnerConfigured]);
+
+  useEffect(() => {
+    if (tab !== 'teacher-register') return;
+    fetchClassTeacherRegistrationOptions()
+      .then(options => {
+        setClassOptions(options);
+        setRequestedClassId(current => current || options[0]?.id || '');
+      })
+      .catch(error => setErrorMsg(error instanceof Error ? error.message : 'Could not load available classes.'));
+  }, [tab]);
 
   // Remember last logged in identifier for quick daily access
   useEffect(() => {
@@ -115,6 +128,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setTimeout(() => { onSuccess(); onClose(); }, 500);
     } else {
       setErrorMsg(result.error || 'Unable to create applicant account.');
+    }
+  };
+
+  const handleTeacherRegistration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+    if (password.length < 8) {
+      setErrorMsg('Choose a password with at least 8 characters.');
+      return;
+    }
+    if (!requestedClassId) {
+      setErrorMsg('There are no available classes to request right now.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const result = await submitClassTeacherRegistration({
+        fullName,
+        username,
+        email,
+        password,
+        phone,
+        classId: requestedClassId,
+      });
+      setPassword('');
+      setSuccessMsg(result.message);
+      setTab('login');
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'Could not submit teacher registration.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -229,7 +274,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <div className="flex gap-2 mt-5 p-1 bg-black/25 rounded-2xl">
               <button
                 type="button"
-                onClick={() => { setTab('login'); setErrorMsg(''); }}
+                onClick={() => { setTab('login'); setErrorMsg(''); setSuccessMsg(''); }}
                 className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
                   tab === 'login'
                     ? 'bg-white text-slate-900 shadow-sm'
@@ -257,14 +302,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {/* Form Content */}
           <div className="p-6 sm:p-7">
             {errorMsg && (
-              <div className="mb-5 p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2.5">
+              <div role="alert" className="mb-5 p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2.5">
                 <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
                 <span>{errorMsg}</span>
               </div>
             )}
 
             {successMsg && (
-              <div className="mb-5 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2.5">
+              <div role="status" className="mb-5 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2.5">
                 <Check className="w-4 h-4 shrink-0 text-emerald-500" />
                 <span>{successMsg}</span>
               </div>
@@ -345,6 +390,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     </button>
                   </div>
                 )}
+              </form>
+            )}
+
+            {tab === 'teacher-register' && (
+              <form onSubmit={handleTeacherRegistration} className="space-y-3.5">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                  Request a class-teacher account. Your selected class and account must be approved by a school administrator before you can sign in.
+                </div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Full name
+                  <input value={fullName} onChange={event => setFullName(event.target.value)} autoComplete="name" required maxLength={150} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs dark:border-slate-700 dark:bg-slate-800" />
+                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Email
+                    <input type="email" value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" required maxLength={191} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs dark:border-slate-700 dark:bg-slate-800" />
+                  </label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Username
+                    <input value={username} onChange={event => setUsername(event.target.value)} autoComplete="username" required minLength={3} maxLength={50} pattern="[a-zA-Z0-9._-]+" className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs dark:border-slate-700 dark:bg-slate-800" />
+                  </label>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Phone
+                    <input type="tel" value={phone} onChange={event => setPhone(event.target.value)} autoComplete="tel" maxLength={50} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs dark:border-slate-700 dark:bg-slate-800" />
+                  </label>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Requested class
+                    <select value={requestedClassId} onChange={event => setRequestedClassId(event.target.value)} required disabled={!classOptions.length} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs dark:border-slate-700 dark:bg-slate-800">
+                      {classOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}
+                    </select>
+                    {!classOptions.length && <span className="mt-1 block font-normal text-slate-500">No unassigned classes are currently available.</span>}
+                  </label>
+                </div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Password
+                  <input type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="new-password" required minLength={8} maxLength={128} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs dark:border-slate-700 dark:bg-slate-800" />
+                </label>
+                <button type="submit" disabled={isSubmitting || !classOptions.length} className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
+                  {isSubmitting ? 'Submitting request…' : 'Submit for administrator approval'}
+                </button>
               </form>
             )}
 

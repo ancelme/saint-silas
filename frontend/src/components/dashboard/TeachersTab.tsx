@@ -2,18 +2,27 @@ import React, { useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import { Role, Teacher, SchoolLevel } from '../../types';
 import { Search, Plus, Mail, Phone, BookOpen, GraduationCap, X, Camera, Upload, Save, Trash2, Settings } from 'lucide-react';
-import { fetchTeacherAssignmentOptions, saveTeacherAssignments, TeacherAssignmentOptions } from '../../services/api';
+import {
+  fetchClassTeacherRegistrationRequests,
+  fetchTeacherAssignmentOptions,
+  reviewClassTeacherRegistration,
+  saveTeacherAssignments,
+  TeacherAssignmentOptions,
+  ClassTeacherRegistrationRequest,
+} from '../../services/api';
 import { ShareToAdminButton } from '../common/ShareToAdminButton';
+import { notifySuccess } from '../common/AppSuccessToast';
 
 interface TeachersTabProps {
   teachers: Teacher[];
   onAddTeacher: (teacher: Teacher) => Promise<void> | void;
   onUpdateTeacher?: (teacher: Teacher) => void;
   onDeleteTeacher?: (id: string) => void;
+  onTeacherApproved?: (teacher: Teacher) => void;
   currentUserRole: Role;
 }
 
-export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher, currentUserRole }) => {
+export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher, onTeacherApproved, currentUserRole }) => {
   const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -28,6 +37,9 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
   const [subjectAssignments, setSubjectAssignments] = useState<{ classId: string; subjectId: string }[]>([]);
   const [assignmentError, setAssignmentError] = useState('');
   const [isSavingAssignment, setIsSavingAssignment] = useState(false);
+  const [registrationRequests, setRegistrationRequests] = useState<ClassTeacherRegistrationRequest[]>([]);
+  const [registrationError, setRegistrationError] = useState('');
+  const [reviewingRequestId, setReviewingRequestId] = useState('');
   const [newTeacher, setNewTeacher] = useState({
     name: '',
     email: '',
@@ -44,6 +56,27 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
     (tch.subject || tch.specialization || '').toLowerCase().includes(search.toLowerCase()) ||
     (tch.department || '').toLowerCase().includes(search.toLowerCase())
   );
+
+  React.useEffect(() => {
+    fetchClassTeacherRegistrationRequests()
+      .then(setRegistrationRequests)
+      .catch(error => setRegistrationError(error instanceof Error ? error.message : 'Could not load registration requests.'));
+  }, []);
+
+  const reviewRegistration = async (request: ClassTeacherRegistrationRequest, decision: 'approve' | 'reject') => {
+    setReviewingRequestId(request.id);
+    setRegistrationError('');
+    try {
+      const result = await reviewClassTeacherRegistration(request.id, decision);
+      setRegistrationRequests(current => current.filter(item => item.id !== request.id));
+      if (result.teacher) onTeacherApproved?.(result.teacher);
+      notifySuccess(result.message);
+    } catch (error) {
+      setRegistrationError(error instanceof Error ? error.message : 'Could not review teacher request.');
+    } finally {
+      setReviewingRequestId('');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,6 +221,41 @@ export const TeachersTab: React.FC<TeachersTabProps> = ({ teachers, onAddTeacher
           <span>Appoint Primary Educator</span>
         </button>
       </div>
+
+      <section className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/70 dark:bg-amber-950/20">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Class-teacher requests</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400">Approve a request to create the account and assign its requested class.</p>
+          </div>
+          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-amber-800 dark:bg-slate-900 dark:text-amber-300">{registrationRequests.length} pending</span>
+        </div>
+        {registrationError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">{registrationError}</p>}
+        {!registrationRequests.length ? (
+          <p className="rounded-xl bg-white/80 p-3 text-xs text-slate-500 dark:bg-slate-900/70">There are no pending class-teacher requests.</p>
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {registrationRequests.map(request => (
+              <article key={request.id} className="flex flex-col justify-between gap-3 rounded-xl border border-amber-100 bg-white p-3 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{request.fullName}</p>
+                  <p className="truncate text-xs text-slate-500">{request.email} · @{request.username}</p>
+                  <p className="mt-1 text-xs font-semibold text-emerald-800 dark:text-emerald-300">Requested class: {request.className}</p>
+                  {request.phone && <p className="text-xs text-slate-500">{request.phone}</p>}
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button type="button" disabled={!!reviewingRequestId} onClick={() => void reviewRegistration(request, 'reject')} className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50 dark:border-rose-900 dark:text-rose-300">
+                    {reviewingRequestId === request.id ? 'Saving…' : 'Reject'}
+                  </button>
+                  <button type="button" disabled={!!reviewingRequestId} onClick={() => void reviewRegistration(request, 'approve')} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                    {reviewingRequestId === request.id ? 'Saving…' : 'Approve & assign'}
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs">
         <div className="relative max-w-md">

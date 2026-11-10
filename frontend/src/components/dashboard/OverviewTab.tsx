@@ -52,6 +52,15 @@ interface OverviewTabProps {
   onNavigateTab: (tab: string) => void;
 }
 
+function getAverageMark(entries: GradeEntry[]): number | null {
+  const scores = entries
+    .map(grade => grade.marks ?? grade.total ?? grade.totalScore)
+    .filter((score): score is number => typeof score === 'number' && Number.isFinite(score) && score >= 0);
+  return scores.length
+    ? Math.round(scores.reduce((total, score) => total + score, 0) / scores.length)
+    : null;
+}
+
 export const OverviewTab: React.FC<OverviewTabProps> = ({
   students,
   teachers,
@@ -82,6 +91,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   const selectedChildGrades = selectedChild
     ? grades.filter(grade => grade.studentId === selectedChild.id)
     : [];
+  const selectedChildAverage = getAverageMark(selectedChildGrades);
 
   // Formatter for Rwandan Francs
   const formatRWF = (num: number) => {
@@ -104,6 +114,21 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
   const presentCount = attendance.filter(a => a.status === 'Present').length;
   const attendanceRate = attendance.length > 0 ? Math.round((presentCount / attendance.length) * 100) : 0;
+  const currentStudent = currentRole === 'student' ? students[0] : undefined;
+  const currentStudentGrades = currentStudent
+    ? grades.filter(grade => grade.studentId === currentStudent.id)
+    : [];
+  const currentStudentAttendance = currentStudent
+    ? attendance.filter(record => record.studentId === currentStudent.id)
+    : [];
+  const currentStudentAverage = getAverageMark(currentStudentGrades);
+  const academicAverage = getAverageMark(grades);
+  const currentStudentAttendanceRate = currentStudentAttendance.length
+    ? Math.round((currentStudentAttendance.filter(record => record.status === 'Present').length / currentStudentAttendance.length) * 100)
+    : null;
+  const today = new Date().toISOString().slice(0, 10);
+  const teacherAttendanceToday = attendance.filter(record => record.date.slice(0, 10) === today);
+  const teacherPresentToday = teacherAttendanceToday.filter(record => record.status === 'Present').length;
 
   return (
     <div className="space-y-6">
@@ -136,7 +161,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
           <p className="text-xs sm:text-sm text-emerald-50/90 font-normal leading-relaxed pt-1">
             {currentRole === 'owner' || currentRole === 'super_admin' ? (
-              'Institutional governance active. Complete sovereign control over academic years, users, classes, finances, and MySQL database backups.'
+              'Institutional governance active. Manage academic years, users, classes, finances, and authorized system settings.'
             ) : currentRole === 'admin' || currentRole === 'head_teacher' ? (
               'Daily school operations, feeding program allocations, pupil admissions, and educator rosters are active across Nursery, Lower Primary, and Upper Primary.'
             ) : currentRole === 'accountant' ? (
@@ -144,7 +169,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             ) : currentRole === 'teacher' ? (
               'Welcome Educator. Your classroom roll-call, lesson plans, marks entry, and assignment evaluations are ready below.'
             ) : currentRole === 'student' ? (
-              'Pupil portal active. Check your class timetable, library reader, homework assignments, and Term 2 report card.'
+              'Pupil portal active. Review your personal timetable, academic records, attendance, and school notices.'
             ) : (
               'Parent & Guardian portal active. Monitor your child’s attendance, daily hot feeding program, and school notices in Kibondo.'
             )}
@@ -260,7 +285,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             <div className="group relative overflow-hidden p-5 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all">
               <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-amber-100/60 dark:bg-amber-900/20" />
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase">Total Revenue Paid</span>
+                <span className="text-xs font-bold text-slate-500 uppercase">Total Fees Collected</span>
                 <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400 flex items-center justify-center">
                   <Wallet className="w-5 h-5" />
                 </div>
@@ -272,13 +297,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             <div className="group relative overflow-hidden p-5 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all">
               <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-violet-100/60 dark:bg-violet-900/20" />
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase">Database & Security</span>
+                <span className="text-xs font-bold text-slate-500 uppercase">Outstanding Fees</span>
                 <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400 flex items-center justify-center">
-                  <Database className="w-5 h-5" />
+                  <Wallet className="w-5 h-5" />
                 </div>
               </div>
-              <p className="text-2xl font-black text-slate-900 dark:text-white">Database Live</p>
-              <p className="text-[11px] text-purple-600 dark:text-purple-400 font-semibold mt-1">Persistent school records</p>
+              <p className="text-2xl font-black text-slate-900 dark:text-white">{formatRWF(totalBalance)}</p>
+              <p className="text-[11px] text-purple-600 dark:text-purple-400 font-semibold mt-1">Remaining student balances</p>
             </div>
           </div>
 
@@ -287,10 +312,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs space-y-3">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Database className="w-4 h-4 text-emerald-600" />
-                <span>MySQL Database & Settings</span>
+                <span>System Settings & Backups</span>
               </h3>
               <p className="text-xs text-slate-500">
-                Manage institutional configurations, school codes, and export complete SQL backup dumps.
+                Manage institutional configurations and review available data-protection options.
               </p>
               <button
                 type="button"
@@ -338,10 +363,61 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         </motion.div>
       )}
 
+      {currentRole === 'admin' && (
+        <motion.section
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="space-y-6"
+          aria-label="Administrator overview"
+        >
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            {[
+              { label: 'Student records', value: students.length, icon: Users, tone: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40 dark:text-blue-300' },
+              { label: 'Teachers', value: teachers.length, icon: GraduationCap, tone: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 dark:text-indigo-300' },
+              { label: 'Recorded attendance', value: `${attendanceRate}%`, icon: CalendarCheck2, tone: 'text-teal-600 bg-teal-50 dark:bg-teal-950/40 dark:text-teal-300' },
+              { label: 'Academic average', value: academicAverage === null ? '—' : `${academicAverage}%`, icon: Award, tone: 'text-violet-600 bg-violet-50 dark:bg-violet-950/40 dark:text-violet-300' },
+              { label: 'Fee collection', value: `${feePercent}%`, icon: Wallet, tone: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300' },
+            ].map(({ label, value, icon: Icon, tone }) => (
+              <div key={label} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-bold uppercase text-slate-500">{label}</p>
+                  <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tone}`}>
+                    <Icon className="h-5 w-5" />
+                  </span>
+                </div>
+                <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <h3 className="mb-3 text-sm font-bold text-slate-900 dark:text-white">School operations</h3>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                { id: 'students', label: 'Students', description: 'Review pupil records and admissions.' },
+                { id: 'teachers', label: 'Teachers', description: 'Manage staff details and assignments.' },
+                { id: 'attendance', label: 'Attendance', description: 'Review school attendance records.' },
+                { id: 'messages', label: 'Announcements', description: 'View and manage school notices.' },
+              ].map(action => (
+                <button
+                  type="button"
+                  key={action.id}
+                  onClick={() => onNavigateTab(action.id)}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-blue-800"
+                >
+                  <span className="block text-sm font-bold text-slate-900 dark:text-white">{action.label}</span>
+                  <span className="mt-1 block text-xs text-slate-500">{action.description}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </motion.section>
+      )}
+
       {/* ========================================================
-          2. ADMIN / HEAD TEACHER SPECIFIC DASHBOARD VIEW
+          2. HEAD TEACHER SPECIFIC DASHBOARD VIEW
          ======================================================== */}
-      {(currentRole === 'admin' || currentRole === 'head_teacher') && (
+      {currentRole === 'head_teacher' && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -370,18 +446,18 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 </div>
               </div>
               <p className="text-2xl font-black text-slate-900 dark:text-white">{attendanceRate}%</p>
-              <p className="text-[11px] text-teal-700 font-semibold mt-1">Morning session attendance</p>
+              <p className="text-[11px] text-teal-700 font-semibold mt-1">Across recorded attendance entries</p>
             </div>
 
             <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase">Feeding Program</span>
+                <span className="text-xs font-bold text-slate-500 uppercase">Academic Average</span>
                 <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400 flex items-center justify-center">
-                  <Utensils className="w-5 h-5" />
+                  <Award className="w-5 h-5" />
                 </div>
               </div>
-              <p className="text-2xl font-black text-slate-900 dark:text-white">{enrolledCount} Meals</p>
-              <p className="text-[11px] text-amber-600 font-semibold mt-1">Hot Lunch & Fresh Milk Daily</p>
+              <p className="text-2xl font-black text-slate-900 dark:text-white">{academicAverage === null ? '—' : `${academicAverage}%`}</p>
+              <p className="text-[11px] text-amber-600 font-semibold mt-1">{grades.length} assessment entries</p>
             </div>
 
             <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs">
@@ -469,13 +545,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         >
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs">
-              <span className="text-xs font-bold text-slate-400 uppercase">Total Term 2 Billing</span>
+              <span className="text-xs font-bold text-slate-400 uppercase">Fees Invoiced</span>
               <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">{formatRWF(totalBilled)}</p>
               <span className="text-[11px] text-slate-500">{fees.length} Total Student Invoices</span>
             </div>
 
             <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs">
-              <span className="text-xs font-bold text-slate-400 uppercase">Collected via MoMo / Bank</span>
+              <span className="text-xs font-bold text-slate-400 uppercase">Payments Received</span>
               <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{formatRWF(totalPaid)}</p>
               <span className="text-[11px] text-emerald-600 font-semibold">{feePercent}% Collection Progress</span>
             </div>
@@ -515,24 +591,26 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           animate={{ opacity: 1 }}
           className="space-y-6"
         >
-          {/* Teacher Header Stats */}
+          {/* Teacher statistics from the teacher-scoped API records */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs">
-              <span className="text-xs font-bold text-slate-400 uppercase">Assigned Class</span>
-              <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">Primary 5 Alpha</p>
-              <span className="text-[11px] text-emerald-600 font-semibold">Kibondo Campus Stream</span>
+              <span className="text-xs font-bold text-slate-400 uppercase">Assigned Students</span>
+              <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">{students.length}</p>
+              <span className="text-[11px] text-emerald-600 font-semibold">Across your assigned classes</span>
             </div>
 
             <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs">
-              <span className="text-xs font-bold text-slate-400 uppercase">Today Teaching Schedule</span>
-              <p className="text-2xl font-black text-teal-600 dark:text-teal-400 mt-1">3 Periods</p>
-              <span className="text-[11px] text-slate-500">Kinyarwanda, SET Science & Math</span>
+              <span className="text-xs font-bold text-slate-400 uppercase">Today’s Attendance</span>
+              <p className="text-2xl font-black text-teal-600 dark:text-teal-400 mt-1">
+                {teacherAttendanceToday.length ? `${teacherPresentToday}/${teacherAttendanceToday.length}` : '—'}
+              </p>
+              <span className="text-[11px] text-slate-500">Recorded for your assigned classes</span>
             </div>
 
             <div className="p-5 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs">
-              <span className="text-xs font-bold text-slate-400 uppercase">Assessment Marks</span>
-              <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">Term 2 Active</p>
-              <span className="text-[11px] text-amber-600 font-semibold">Continuous evaluation</span>
+              <span className="text-xs font-bold text-slate-400 uppercase">Recorded Marks</span>
+              <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{grades.length}</p>
+              <span className="text-[11px] text-amber-600 font-semibold">For assigned students and subjects</span>
             </div>
           </div>
 
@@ -540,21 +618,21 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3">
                 <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300">
-                  <CalendarCheck2 className="w-5 h-5" />
+                    <Award className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-slate-900 dark:text-white">Daily Attendance</h3>
+                    <h3 className="text-base font-black text-slate-900 dark:text-white">Academic Records</h3>
                   <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                    Record attendance through the official database-backed attendance register.
+                      Review and update marks for your assigned students and subjects.
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => onNavigateTab('attendance')}
+                onClick={() => onNavigateTab('grades')}
                 className="px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20 transition-colors cursor-pointer"
               >
-                Open Attendance Register
+                Open Marks & Results
               </button>
             </div>
           </div>
@@ -570,47 +648,73 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           animate={{ opacity: 1 }}
           className="space-y-6"
         >
-          {/* Pupil Identity Banner */}
-          <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <img
-                src={user?.avatar || "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=250&q=80"}
-                alt={user?.fullName || 'Student'}
-                className="w-16 h-16 rounded-2xl object-cover border-2 border-emerald-500 shadow-md"
-                referrerPolicy="no-referrer"
-              />
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                    {user?.fullName || user?.name || 'Pupil'}
-                  </h3>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] font-bold">
-                    Primary 5 Alpha
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500">
-                  Roll No: <span className="font-mono font-bold text-emerald-600">SSP-2026-P5-001</span> • Class Teacher: Mwalimu Jean Bosco Mugabo
-                </p>
-                <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-600 dark:text-slate-400">
-                  <span className="flex items-center gap-1 font-semibold text-emerald-600">
-                    <Award className="w-3.5 h-3.5" />
-                    <span>Class Rank: 2nd Distinction</span>
-                  </span>
-                  <span>•</span>
-                  <span>Term 2 Average: <strong>90.8%</strong></span>
+          {currentStudent ? (
+            <>
+            <div className="p-6 rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                {currentStudent.photoUrl || user?.avatar ? (
+                  <img
+                    src={currentStudent.photoUrl || user?.avatar}
+                    alt={`${currentStudent.firstName} ${currentStudent.lastName}`}
+                    className="w-16 h-16 rounded-2xl object-cover border-2 border-emerald-500 shadow-md"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                    <GraduationCap className="h-7 w-7" />
+                  </div>
+                )}
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                      {currentStudent.firstName} {currentStudent.lastName}
+                    </h3>
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                      {currentStudent.grade} {currentStudent.section}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Admission number: <span className="font-mono font-bold text-emerald-600">{currentStudent.rollNo}</span>
+                  </p>
+                  <p className="mt-1.5 text-xs text-slate-600 dark:text-slate-400">
+                    Academic average: <strong>{currentStudentAverage === null ? 'No marks recorded' : `${currentStudentAverage}%`}</strong>
+                  </p>
                 </div>
               </div>
-            </div>
 
-            <button
-              type="button"
-              onClick={() => setShowReportCardModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 cursor-pointer"
-            >
-              <FileText className="w-4 h-4" />
-              <span>View Official Report Card (Indangamanota)</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => setShowReportCardModal(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700"
+              >
+                <FileText className="h-4 w-4" />
+                <span>View Results Summary</span>
+              </button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+                <p className="text-xs font-semibold text-slate-500">Subjects with marks</p>
+                <p className="mt-1 text-xl font-black text-slate-900 dark:text-white">
+                  {new Set(currentStudentGrades.map(grade => grade.subject)).size}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+                <p className="text-xs font-semibold text-slate-500">Attendance rate</p>
+                <p className="mt-1 text-xl font-black text-slate-900 dark:text-white">
+                  {currentStudentAttendanceRate === null ? '—' : `${currentStudentAttendanceRate}%`}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+                <p className="text-xs font-semibold text-slate-500">Recorded results</p>
+                <p className="mt-1 text-xl font-black text-slate-900 dark:text-white">{currentStudentGrades.length}</p>
+              </div>
+            </div>
+            </>
+          ) : (
+            <div role="status" className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+              No student record is linked to this account. Contact the school administrator to link your pupil profile.
+            </div>
+          )}
         </motion.div>
       )}
 
@@ -647,7 +751,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               </div>
 
               {selectedChild && (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <div className="space-y-2 rounded-3xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-800">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-500">Student Profile</span>
@@ -674,6 +778,16 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                     <p className="text-[11px] text-slate-500">
                       {selectedChildAttendance[0]?.date || 'Attendance records will appear here'}
                     </p>
+                  </div>
+                  <div className="space-y-2 rounded-3xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-800">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500">Academic Average</span>
+                      <Award className="h-5 w-5 text-violet-600" />
+                    </div>
+                    <p className="text-base font-black text-slate-900 dark:text-white">
+                      {selectedChildAverage === null ? 'No marks recorded' : `${selectedChildAverage}%`}
+                    </p>
+                    <p className="text-[11px] text-slate-500">{selectedChildGrades.length} recorded results</p>
                   </div>
                   <div className="space-y-2 rounded-3xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-800">
                     <div className="flex items-center justify-between">
@@ -731,7 +845,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         </motion.div>
       )}
 
-      {/* Official Report Card (Indangamanota) Modal for Student/Parent */}
+      {/* Results summary uses only marks returned for the signed-in student. */}
       {showReportCardModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <motion.div
@@ -741,7 +855,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           >
             <div className="flex justify-between items-center pb-3 border-b border-slate-200">
               <span className="text-xs font-bold text-emerald-700 uppercase">
-                Official Term 2 Report Card (Indangamanota)
+                Student Results Summary
               </span>
               <div className="flex items-center gap-2">
                 <button
@@ -750,7 +864,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                   className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 flex items-center gap-1.5 cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Print Report Card</span>
+                  <span>Print Results</span>
                 </button>
                 <button
                   type="button"
@@ -780,24 +894,31 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs p-3 rounded-2xl bg-slate-50 border border-slate-200">
               <div>
                 <span className="text-[10px] text-slate-400 block">Pupil Name</span>
-                <span className="font-bold text-slate-800">{user?.fullName || 'Student'}</span>
+                <span className="font-bold text-slate-800">
+                  {currentStudent ? `${currentStudent.firstName} ${currentStudent.lastName}` : user?.fullName || 'Student'}
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 block">Class & Stream</span>
-                <span className="font-bold text-slate-800">Primary 5 Alpha</span>
+                <span className="font-bold text-slate-800">
+                  {currentStudent ? `${currentStudent.grade} ${currentStudent.section}` : '—'}
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 block">Term / Year</span>
-                <span className="font-bold text-slate-800">Term 2, 2026</span>
+                <span className="font-bold text-slate-800">{currentStudentGrades[0]?.term || 'Not recorded'}</span>
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 block">Position in Class</span>
-                <span className="font-bold text-emerald-700">2nd Distinction</span>
+                <span className="font-bold text-emerald-700">
+                  {currentStudentAverage === null ? 'No marks recorded' : `${currentStudentAverage}% average`}
+                </span>
               </div>
             </div>
 
             {/* Marks Table */}
-            <table className="w-full text-xs text-left">
+            <div className="overflow-x-auto">
+            <table className="min-w-[36rem] w-full text-xs text-left">
               <thead className="bg-slate-100 font-bold uppercase text-[10px] text-slate-600">
                 <tr>
                   <th className="py-2.5 px-3">Subject</th>
@@ -807,53 +928,49 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                <tr>
-                  <td className="py-2.5 px-3 font-semibold">Ikinyarwanda (Reading & Composition)</td>
-                  <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">94 / 100</td>
-                  <td className="py-2.5 px-3 font-bold text-emerald-600">A (Exemplary)</td>
-                  <td className="py-2.5 px-3 text-slate-600">Exceptional fluency in Ikinyarwanda</td>
-                </tr>
-                <tr>
-                  <td className="py-2.5 px-3 font-semibold">Competence Mathematics</td>
-                  <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">88 / 100</td>
-                  <td className="py-2.5 px-3 font-bold text-emerald-600">A</td>
-                  <td className="py-2.5 px-3 text-slate-600">Strong mastery of fractions & geometry</td>
-                </tr>
-                <tr>
-                  <td className="py-2.5 px-3 font-semibold">English Language Skills</td>
-                  <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">91 / 100</td>
-                  <td className="py-2.5 px-3 font-bold text-emerald-600">A</td>
-                  <td className="py-2.5 px-3 text-slate-600">Very articulate and disciplined</td>
-                </tr>
-                <tr>
-                  <td className="py-2.5 px-3 font-semibold">SET (Science & Elementary Technology)</td>
-                  <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">92 / 100</td>
-                  <td className="py-2.5 px-3 font-bold text-emerald-600">A</td>
-                  <td className="py-2.5 px-3 text-slate-600">Enthusiastic in STEM science experiments</td>
-                </tr>
-                <tr>
-                  <td className="py-2.5 px-3 font-semibold">Social & Religious Studies (SRS)</td>
-                  <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">89 / 100</td>
-                  <td className="py-2.5 px-3 font-bold text-emerald-600">A</td>
-                  <td className="py-2.5 px-3 text-slate-600">Exemplary moral and cultural conduct</td>
-                </tr>
-                <tr className="bg-emerald-50 font-bold">
-                  <td className="py-3 px-3 text-emerald-900">Overall Average Score</td>
-                  <td className="py-3 px-3 font-mono text-emerald-900 text-sm">90.8%</td>
-                  <td className="py-3 px-3 text-emerald-900">Grade I Distinction</td>
-                  <td className="py-3 px-3 text-emerald-900">Promoted with Highest Honors</td>
-                </tr>
+                {currentStudentGrades.length ? currentStudentGrades.map(grade => {
+                  const score = grade.marks ?? grade.total ?? grade.totalScore;
+                  return (
+                    <tr key={grade.id}>
+                      <td className="py-2.5 px-3 font-semibold">{grade.subject}</td>
+                      <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">
+                        {typeof score === 'number' ? `${score} / 100` : '—'}
+                      </td>
+                      <td className="py-2.5 px-3 font-bold text-emerald-600">
+                        {grade.grade || grade.gradeLetter || grade.letterGrade || '—'}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-600">{grade.remarks || '—'}</td>
+                    </tr>
+                  );
+                }) : (
+                  <tr>
+                    <td colSpan={4} className="py-5 px-3 text-center text-slate-500">
+                      No assessment results have been recorded for this account.
+                    </td>
+                  </tr>
+                )}
+                {currentStudentAverage !== null && (
+                  <tr className="bg-emerald-50 font-bold">
+                    <td className="py-3 px-3 text-emerald-900">Recorded average</td>
+                    <td className="py-3 px-3 font-mono text-emerald-900 text-sm">{currentStudentAverage}%</td>
+                    <td className="py-3 px-3 text-emerald-900">—</td>
+                    <td className="py-3 px-3 text-emerald-900">Based on recorded marks</td>
+                  </tr>
+                )}
               </tbody>
             </table>
+            </div>
 
             <div className="flex justify-between items-end pt-4 border-t border-slate-200 text-xs">
               <div>
-                <p className="font-bold text-slate-800">Class Teacher: Jean Bosco Mugabo</p>
-                <p className="italic text-slate-500">"Exemplary diligence and academic excellence."</p>
+                <p className="font-bold text-slate-800">Attendance rate</p>
+                <p className="italic text-slate-500">
+                  {currentStudentAttendanceRate === null ? 'No attendance records are available.' : `${currentStudentAttendanceRate}% of recorded attendance was present.`}
+                </p>
               </div>
               <div className="text-right">
-                <p className="font-serif italic font-bold">Mwalimu Emmanuel Twahirwa</p>
-                <p className="text-[10px] text-slate-500">Head Teacher, St. Silas Primary</p>
+                <p className="font-serif italic font-bold">St. Silas Private Primary School</p>
+                <p className="text-[10px] text-slate-500">Contact the school for a signed official report.</p>
               </div>
             </div>
           </motion.div>

@@ -27,9 +27,8 @@ export async function getStudents(req: AuthRequest, res: Response) {
       ))`;
       params.push(userId, userId);
     } else if (userRole === 'student') {
-      // Find student linked to user email or username
-      query += ` AND (LOWER(s.first_name) = LOWER(?) OR LOWER(s.admission_number) = LOWER(?))`;
-      params.push(req.user?.username || '', req.user?.username || '');
+      query += ` AND s.user_id = ?`;
+      params.push(userId);
     } else if (userRole === 'teacher') {
       query += ` AND EXISTS (
         SELECT 1
@@ -76,6 +75,7 @@ export async function getStudents(req: AuthRequest, res: Response) {
     const students = result.rows.map(row => ({
       id: row.id,
       classId: row.class_id,
+      hasUserAccount: ['owner', 'super_admin', 'admin'].includes(userRole || '') ? Boolean(row.user_id) : undefined,
       rollNo: row.admission_number,
       firstName: row.first_name,
       lastName: row.last_name,
@@ -253,6 +253,57 @@ export async function updateStudent(req: AuthRequest, res: Response) {
       attendanceRate,
       overallGPA
     } = req.body;
+
+    if (req.user?.role === 'teacher') {
+      if (req.user.teacherType !== 'class_teacher') {
+        return res.status(403).json({ error: 'Only class teachers can update their class pupil profiles.' });
+      }
+      const assignedStudent = await db.query(
+        `SELECT s.id, s.parent_id
+         FROM students s
+         JOIN classes c ON c.id = s.class_id
+         JOIN teachers t ON t.id = c.class_teacher_id
+         WHERE s.id = ? AND s.status <> 'Archived' AND t.user_id = ? AND t.teacher_type = 'class_teacher'`,
+        [id, req.user.id],
+      );
+      const assigned = assignedStudent.rows[0];
+      if (!assigned) return res.status(403).json({ error: 'You can update pupils only in your assigned class.' });
+
+      const cleanFirstName = typeof firstName === 'string' ? firstName.trim() : '';
+      const cleanLastName = typeof lastName === 'string' ? lastName.trim() : '';
+      const cleanParentEmail = typeof parentEmail === 'string' ? parentEmail.trim().toLowerCase() : '';
+      const cleanParentPhone = typeof parentPhone === 'string' ? parentPhone.trim() : '';
+      const cleanParentName = typeof parentName === 'string' ? parentName.trim() : '';
+      const cleanAddress = typeof address === 'string' ? address.trim() : '';
+      if (!cleanFirstName || !cleanLastName || cleanFirstName.length > 100 || cleanLastName.length > 100 ||
+          cleanParentName.length > 150 || cleanParentPhone.length > 50 || cleanParentEmail.length > 191 ||
+          cleanAddress.length > 500) {
+        return res.status(400).json({ error: 'Pupil and guardian details exceed the allowed limits or are incomplete.' });
+      }
+      if (cleanParentEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanParentEmail)) {
+        return res.status(400).json({ error: 'Enter a valid guardian email address.' });
+      }
+
+      await db.query(
+        `UPDATE students SET first_name = ?, last_name = ?, address = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [cleanFirstName, cleanLastName, cleanAddress, id],
+      );
+      if (assigned.parent_id) {
+        await db.query(
+          `UPDATE parents SET full_name = ?, phone = ?, email = ? WHERE id = ?`,
+          [cleanParentName, cleanParentPhone, cleanParentEmail, assigned.parent_id],
+        );
+      }
+      await recordAuditLog({
+        userId: req.user.id,
+        userName: req.user.fullName,
+        role: req.user.role,
+        action: 'CLASS_TEACHER_PUPIL_UPDATE',
+        details: `Updated pupil and guardian contact details for student ID ${id}.`,
+        ipAddress: req.ip,
+      });
+      return res.json({ message: 'Pupil details updated successfully.' });
+    }
 
     await db.query(
       `UPDATE students

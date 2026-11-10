@@ -107,7 +107,9 @@ Vercel serves the Vite frontend from `frontend/dist` and routes `/api/*` to the
 Express handler in `api/[...path].ts`. Add `SUPABASE_DB_URL` (the Supabase
 PostgreSQL connection pooler string) and a strong `JWT_SECRET` to the Vercel
 project's Production environment variables, then deploy the `main` branch. The
-`/api` routes require those variables at runtime. Vercel Functions do not host
+`/api` routes require those variables at runtime. Vercel startup fails if
+`SUPABASE_DB_URL` is missing rather than silently using temporary SQLite
+storage that would lose writes between function instances. Vercel Functions do not host
 the Socket.IO server, so realtime chat sockets require a separate
 WebSocket-capable service.
 

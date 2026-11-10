@@ -30,6 +30,15 @@ export async function getStudentReports(req: AuthRequest, res: Response) {
          ORDER BY r.published_at DESC`,
         [req.user.id, req.user.id],
       );
+    } else if (req.user?.role === 'student') {
+      result = await db.query(
+        `SELECT r.report_json
+         FROM student_reports r
+         JOIN students s ON s.id = r.student_id
+         WHERE s.user_id = ?
+         ORDER BY r.published_at DESC`,
+        [req.user.id],
+      );
     } else if (req.user?.role === 'teacher' && req.user.teacherType === 'class_teacher') {
       result = await db.query(
         `SELECT r.report_json

@@ -29,6 +29,12 @@ import {
   getTeachers,
   getTeacherAssignmentOptions,
   getMyTeacherAssignments,
+  getClassTeacherRegistrationOptions,
+  submitClassTeacherRegistration,
+  getClassTeacherRegistrationRequests,
+  reviewClassTeacherRegistration,
+  getClassAnnouncements,
+  createClassAnnouncement,
   updateTeacherAssignments,
   createTeacher,
   updateTeacher,
@@ -187,8 +193,14 @@ router.put('/students/:id', authenticateToken, requireRole('admin', 'head_teache
 router.delete('/students/:id', authenticateToken, requireRole('admin'), archiveStudent);
 
 router.get('/teachers', authenticateToken, requireRole('admin', 'head_teacher'), getTeachers);
+router.get('/teachers/registration-options', getClassTeacherRegistrationOptions);
+router.post('/teachers/register', submitClassTeacherRegistration);
+router.get('/teachers/registration-requests', authenticateToken, requireRole('owner', 'super_admin', 'admin', 'head_teacher'), getClassTeacherRegistrationRequests);
+router.put('/teachers/registration-requests/:id', authenticateToken, requireRole('owner', 'super_admin', 'admin', 'head_teacher'), reviewClassTeacherRegistration);
 router.get('/teachers/assignment-options', authenticateToken, requireRole('admin'), getTeacherAssignmentOptions);
 router.get('/teachers/my-assignments', authenticateToken, requireRole('teacher'), getMyTeacherAssignments);
+router.get('/teachers/class-announcements', authenticateToken, requireRole('teacher'), getClassAnnouncements);
+router.post('/teachers/class-announcements', authenticateToken, requireRole('teacher'), createClassAnnouncement);
 router.post('/teachers', authenticateToken, requireRole('admin'), createTeacher);
 router.put('/teachers/:id/assignments', authenticateToken, requireRole('admin'), updateTeacherAssignments);
 router.put('/teachers/:id', authenticateToken, requireRole('admin'), updateTeacher);

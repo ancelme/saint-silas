@@ -25,9 +25,10 @@ import { ShareToAdminButton } from '../common/ShareToAdminButton';
 interface StudentsTabProps {
   students: Student[];
   onAddStudent: (newStudent: Student) => Promise<void> | void;
-  onUpdateStudent: (student: Student) => void;
+  onUpdateStudent: (student: Student) => Promise<void> | void;
   onDeleteStudent?: (id: string) => void;
   isParentView?: boolean;
+  isTeacherView?: boolean;
 }
 
 export const StudentsTab: React.FC<StudentsTabProps> = ({
@@ -35,6 +36,7 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
   onAddStudent,
   onUpdateStudent,
   isParentView = false,
+  isTeacherView = false,
 }) => {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,6 +48,10 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
   const [photoError, setPhotoError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditingStudent, setIsEditingStudent] = useState(false);
+  const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
+  const [updateError, setUpdateError] = useState('');
+  const [studentEdit, setStudentEdit] = useState({ firstName: '', lastName: '', parentName: '', parentPhone: '', parentEmail: '', address: '' });
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   // New Student Form State
@@ -180,6 +186,36 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
     }
   };
 
+  const beginStudentEdit = () => {
+    if (!activeStudent) return;
+    setStudentEdit({
+      firstName: activeStudent.firstName,
+      lastName: activeStudent.lastName,
+      parentName: activeStudent.parentName,
+      parentPhone: activeStudent.parentPhone,
+      parentEmail: activeStudent.parentEmail,
+      address: activeStudent.address,
+    });
+    setUpdateError('');
+    setIsEditingStudent(true);
+  };
+
+  const saveStudentEdit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!activeStudent) return;
+    setIsUpdatingStudent(true);
+    setUpdateError('');
+    try {
+      await onUpdateStudent({ ...activeStudent, ...studentEdit });
+      setActiveStudent(current => current ? { ...current, ...studentEdit } : current);
+      setIsEditingStudent(false);
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : 'Pupil details could not be updated.');
+    } finally {
+      setIsUpdatingStudent(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header & Controls */}
@@ -195,7 +231,7 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
           </p>
         </div>
 
-        {!isParentView && (
+        {!isParentView && !isTeacherView && (
           <button
             type="button"
             onClick={() => setIsEnrollModalOpen(true)}
@@ -437,7 +473,7 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
               </div>
             </div>
 
-            {!isParentView && <div className="space-y-2 text-xs">
+            {!isParentView && !isEditingStudent && <div className="space-y-2 text-xs">
               <h4 className="font-bold text-slate-900 dark:text-white">Parent & Residential Details (Gatsibo)</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                 <div className="space-y-1">
@@ -455,10 +491,31 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
               </div>
             </div>}
 
-            <div className="flex justify-end pt-2">
+            {isTeacherView && isEditingStudent && (
+              <form onSubmit={event => void saveStudentEdit(event)} className="space-y-3 rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+                {updateError && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-xs text-rose-800 dark:bg-rose-950/40 dark:text-rose-200">{updateError}</p>}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">First name<input value={studentEdit.firstName} onChange={event => setStudentEdit(current => ({ ...current, firstName: event.target.value }))} required maxLength={100} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800" /></label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Last name<input value={studentEdit.lastName} onChange={event => setStudentEdit(current => ({ ...current, lastName: event.target.value }))} required maxLength={100} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800" /></label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Parent / guardian<input value={studentEdit.parentName} onChange={event => setStudentEdit(current => ({ ...current, parentName: event.target.value }))} maxLength={150} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800" /></label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Guardian phone<input value={studentEdit.parentPhone} onChange={event => setStudentEdit(current => ({ ...current, parentPhone: event.target.value }))} maxLength={50} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800" /></label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 sm:col-span-2">Guardian email<input type="email" value={studentEdit.parentEmail} onChange={event => setStudentEdit(current => ({ ...current, parentEmail: event.target.value }))} maxLength={191} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800" /></label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 sm:col-span-2">Address<input value={studentEdit.address} onChange={event => setStudentEdit(current => ({ ...current, address: event.target.value }))} maxLength={500} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800" /></label>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => setIsEditingStudent(false)} className="rounded-xl border px-3 py-2 text-xs font-bold dark:border-slate-700">Cancel</button>
+                  <button type="submit" disabled={isUpdatingStudent} className="rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{isUpdatingStudent ? 'Saving…' : 'Save pupil details'}</button>
+                </div>
+              </form>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              {isTeacherView && !isEditingStudent && (
+                <button type="button" onClick={beginStudentEdit} className="rounded-xl bg-emerald-700 px-5 py-2 text-xs font-bold text-white">Edit pupil details</button>
+              )}
               <button
                 type="button"
-                onClick={() => setActiveStudent(null)}
+                onClick={() => { setActiveStudent(null); setIsEditingStudent(false); }}
                 className="px-5 py-2 rounded-xl text-xs font-bold border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300"
               >
                 Close Profile
@@ -469,7 +526,7 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
       )}
 
       {/* New Pupil Enrollment Modal */}
-      {!isParentView && isEnrollModalOpen && (
+      {!isParentView && !isTeacherView && isEnrollModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="relative w-full max-w-xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-8 space-y-6">
             <button

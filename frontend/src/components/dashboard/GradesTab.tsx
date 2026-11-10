@@ -39,10 +39,10 @@ export const GradesTab: React.FC<GradesTabProps> = ({
   const [isNewMarkFormOpen, setIsNewMarkFormOpen] = useState(false);
 
   React.useEffect(() => {
-    if (teacherType !== 'subject_teacher') return;
+    if (!teacherType) return;
     fetchMyTeacherAssignments()
       .then(setTeacherAssignments)
-      .catch(error => setSaveError(error instanceof Error ? error.message : 'Unable to load subject assignments.'));
+      .catch(error => setSaveError(error instanceof Error ? error.message : 'Unable to load teacher assignments.'));
   }, [teacherType]);
 
   const currentStudent = students.find(s => s.id === selectedStudentId) || students[0];
@@ -159,20 +159,20 @@ export const GradesTab: React.FC<GradesTabProps> = ({
             <Printer className="w-4 h-4" />
             <span>Generate Report Card</span>
           </button>}
-          {teacherType === 'subject_teacher' && (
+          {teacherType && (
             <button
               type="button"
               onClick={() => setIsNewMarkFormOpen(open => !open)}
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600 px-3.5 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
             >
               <Plus className="h-4 w-4" />
-              {isNewMarkFormOpen ? 'Close Mark Form' : 'Record Subject Mark'}
+              {isNewMarkFormOpen ? 'Close Mark Form' : 'Record Class Mark'}
             </button>
           )}
         </div>
       </div>
 
-      {teacherType === 'subject_teacher' && isNewMarkFormOpen && (
+      {teacherType && isNewMarkFormOpen && (
         <form onSubmit={handleCreateMark} className="grid gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-900 dark:bg-emerald-950/20 sm:grid-cols-2">
           <label className="space-y-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
             Class and subject
@@ -237,7 +237,7 @@ export const GradesTab: React.FC<GradesTabProps> = ({
             {isCreatingMark ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             Save subject mark
           </button>
-          {!assignedSubjects.length && <p className="text-xs text-amber-700 dark:text-amber-300 sm:col-span-2">No subjects have been assigned to this teacher account.</p>}
+          {!assignedSubjects.length && <p className="text-xs text-amber-700 dark:text-amber-300 sm:col-span-2">No subjects are available for this teacher’s assigned class.</p>}
         </form>
       )}
 
