@@ -108,7 +108,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onClose();
       }, 500);
     } else {
-      setErrorMsg(res.error || 'Authentication failed. Please verify credentials.');
+      const errorMessage = res.error || 'Authentication failed. Please verify credentials.';
+      setErrorMsg(
+        errorMessage.includes('Production database configuration is missing') ||
+        errorMessage.includes('API could not initialize')
+          ? 'Sign-in is temporarily unavailable. Please contact the school administrator.'
+          : errorMessage
+      );
     }
   };
 
