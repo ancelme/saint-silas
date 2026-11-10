@@ -3,14 +3,25 @@ import { GoogleGenAI } from '@google/genai';
 import { db } from '../db/index';
 import { AuthRequest } from '../middleware/auth';
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    },
-  },
-});
+let ai: GoogleGenAI | null = null;
+
+function getGeminiClient(): GoogleGenAI | null {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  if (!ai) {
+    ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
+  }
+
+  return ai;
+}
 
 const SCHOOL_CONTEXT = `St. Silas Private Primary School (EAR Kibondo), REB Code: 530413, located in Kibondo Village, Simbwa Cell, Kabarore Sector, Gatsibo District, Rwanda.
 Motto: Knowledge, Character, and Diligence (Ubumenyi, Ubupfura, n'Umurava).
@@ -20,7 +31,10 @@ Daily Feeding: Fortified porridge and hot lunch daily.`;
 
 async function runGeminiPrompt(prompt: string, systemInstruction: string): Promise<string> {
   try {
-    const response = await ai.models.generateContent({
+    const client = getGeminiClient();
+    if (!client) return '';
+
+    const response = await client.models.generateContent({
       model: 'gemini-3.8-flash',
       contents: prompt,
       config: {
