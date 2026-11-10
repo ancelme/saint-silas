@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { app, initializeApp } from '../backend/server.bundle.mjs';
+import { getInitializationErrorMessage } from './initializationError';
 
 let initialization: Promise<void> | undefined;
 
@@ -29,12 +30,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (res.headersSent) {
       return;
     }
-    const supabaseUrlMissing = error instanceof Error
-      && error.message === 'SUPABASE_DB_URL is required to connect to Supabase.';
     return res.status(500).json({
-      error: supabaseUrlMissing
-        ? 'Supabase database configuration is missing.'
-        : 'The API could not initialize. Check the Vercel function logs.'
+      error: getInitializationErrorMessage(error)
     });
   }
 }

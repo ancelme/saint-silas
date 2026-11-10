@@ -104,14 +104,17 @@ sign-in persistence, not data retention.
 ## Deploy to Vercel
 
 Vercel serves the Vite frontend from `frontend/dist` and routes `/api/*` to the
-Express handler in `api/[...path].ts`. Add `SUPABASE_DB_URL` (the Supabase
-PostgreSQL connection pooler string) and a strong `JWT_SECRET` to the Vercel
-project's Production environment variables, then deploy the `main` branch. The
-`/api` routes require those variables at runtime. Vercel startup fails if
-`SUPABASE_DB_URL` is missing rather than silently using temporary SQLite
-storage that would lose writes between function instances. Vercel Functions do not host
-the Socket.IO server, so realtime chat sockets require a separate
-WebSocket-capable service.
+Express handler in `api/[...path].ts`. In the Vercel project, open **Settings >
+Environment Variables** and set `SUPABASE_DB_URL` to the existing Supabase
+PostgreSQL connection pooler string and `JWT_SECRET` to a strong secret for
+Production. Then redeploy `main` so the function receives the variables.
+
+The API will not start without `SUPABASE_DB_URL`: Vercel's temporary filesystem
+cannot provide durable SQLite storage. If moving data from local SQLite, migrate
+and verify it in Supabase before switching production to that database. Never
+commit either connection string or secret. Vercel Functions do not host the
+Socket.IO server, so realtime chat sockets require a separate WebSocket-capable
+service.
 
 ### Running without internet
 

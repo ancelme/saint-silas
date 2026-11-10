@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { isTeacherInactive } from '../../backend/src/middleware/auth.ts';
+import { getInitializationErrorMessage } from '../../api/initializationError.ts';
 
 const dashboardLayout = await readFile(
   new URL('../../frontend/src/components/dashboard/DashboardLayout.tsx', import.meta.url),
@@ -34,6 +35,22 @@ test('inactive teachers are rejected while active teachers and other roles are u
   assert.equal(isTeacherInactive({ role: 'teacher', teacher_status: 'Inactive' }), true);
   assert.equal(isTeacherInactive({ role: 'teacher', teacher_status: 'Active' }), false);
   assert.equal(isTeacherInactive({ role: 'admin', teacher_status: 'Inactive' }), false);
+});
+
+test('missing Vercel database configuration returns actionable setup guidance', () => {
+  const message = getInitializationErrorMessage(
+    new Error('SUPABASE_DB_URL is required on Vercel; SQLite data in /tmp is not durable.'),
+  );
+  assert.match(message, /SUPABASE_DB_URL/);
+  assert.match(message, /Production environment variables/);
+  assert.match(message, /redeploy/);
+});
+
+test('other initialization errors do not expose internal details', () => {
+  assert.equal(
+    getInitializationErrorMessage(new Error('database connection refused')),
+    'The API could not initialize. Check the Vercel function logs.',
+  );
 });
 
 test('Vercel refuses SQLite when durable database configuration is missing', () => {
