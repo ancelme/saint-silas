@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { app, initializeApp } from '../backend/server.bundle.mjs';
-import { getInitializationErrorMessage } from './initializationError';
+import { getInitializationErrorMessage } from './initializationError.js';
 
 let initialization: Promise<void> | undefined;
 
