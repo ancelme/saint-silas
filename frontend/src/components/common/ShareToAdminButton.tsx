@@ -1,5 +1,5 @@
 import React from 'react';
-import { Share2 } from 'lucide-react';
+import { ShareDocumentButton } from './ShareDocumentButton';
 
 export interface AdminReportDraft {
   subject: string;
@@ -21,16 +21,12 @@ export const ShareToAdminButton: React.FC<ShareToAdminButtonProps> = ({
   subject,
   body,
   className = '',
-  label = 'Share with Admin',
+  label = 'Share',
 }) => (
-  <button
-    type="button"
-    onClick={() => shareRecordInChat({ subject, body })}
+  <ShareDocumentButton
+    title={subject}
+    text={body}
+    label={label}
     className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-emerald-900/60 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-emerald-950/40 ${className}`}
-    aria-label={`${label}: ${subject}`}
-    title={`${label}: ${subject}`}
-  >
-    <Share2 className="h-3.5 w-3.5 shrink-0" />
-    <span>{label}</span>
-  </button>
+  />
 );

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { StudentMidtermReport } from '../../types';
 import { fetchStudentReports } from '../../services/api';
 import { ShareDocumentButton } from '../common/ShareDocumentButton';
-import { ShareToAdminButton } from '../common/ShareToAdminButton';
 
 export const ParentReportsTab: React.FC = () => {
   const [reports, setReports] = useState<StudentMidtermReport[]>([]);
@@ -43,15 +42,9 @@ export const ParentReportsTab: React.FC = () => {
               <p className="text-xs text-slate-500">{report.grade} · {report.period}</p>
             </div>
             <div className="flex items-center gap-2">
-              <ShareToAdminButton
-                label="Send to Admin"
-                subject={`${report.studentName} - ${report.period} Report`}
-                body={`Class: ${report.grade}\nAttendance: ${report.attendance.total ? Math.round((report.attendance.present / report.attendance.total) * 100) : 0}%\n${report.teacherName}'s class-teacher report.`}
-                className="text-[10px]"
-              />
               <ShareDocumentButton
                 title={`${report.studentName} - ${report.period} Report`}
-                text={`Class: ${report.grade}. Attendance: ${report.attendance.total ? Math.round((report.attendance.present / report.attendance.total) * 100) : 0}%. ${report.teacherName}'s class-teacher report.`}
+                text={`Class: ${report.grade}\nAttendance: ${report.attendance.total ? Math.round((report.attendance.present / report.attendance.total) * 100) : 0}%\n${report.attendance.total} attendance records: ${report.attendance.present} present, ${report.attendance.absent} absent, ${report.attendance.late} late, ${report.attendance.excused} excused.\n${report.teacherName}'s class-teacher report.`}
                 className="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs"
               />
               <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">

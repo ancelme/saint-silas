@@ -5,9 +5,15 @@ interface ShareDocumentButtonProps {
   title: string;
   text: string;
   className?: string;
+  label?: string;
 }
 
-export const ShareDocumentButton: React.FC<ShareDocumentButtonProps> = ({ title, text, className = '' }) => {
+export const ShareDocumentButton: React.FC<ShareDocumentButtonProps> = ({
+  title,
+  text,
+  className = '',
+  label = 'Share',
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -38,10 +44,13 @@ export const ShareDocumentButton: React.FC<ShareDocumentButtonProps> = ({ title,
       <button
         type="button"
         onClick={() => setIsOpen(open => !open)}
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
         className={`inline-flex items-center gap-2 rounded-xl font-bold cursor-pointer ${className}`}
       >
         <Share2 className="h-4 w-4" />
-        <span>Share</span>
+        <span>{label}</span>
       </button>
       {isOpen && (
         <>
@@ -53,7 +62,7 @@ export const ShareDocumentButton: React.FC<ShareDocumentButtonProps> = ({ title,
           />
           <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900">
             <div className="mb-1 flex items-center justify-between px-2 py-1">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Share document with</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Share with</span>
               <button type="button" onClick={() => setIsOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                 <X className="h-3.5 w-3.5" />
               </button>

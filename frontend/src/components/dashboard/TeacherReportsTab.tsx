@@ -3,7 +3,6 @@ import { FileCheck2, LoaderCircle, Send } from 'lucide-react';
 import { Student } from '../../types';
 import { publishMidtermReports } from '../../services/api';
 import { ShareDocumentButton } from '../common/ShareDocumentButton';
-import { ShareToAdminButton } from '../common/ShareToAdminButton';
 
 interface TeacherReportsTabProps {
   students: Student[];
@@ -117,11 +116,6 @@ export const TeacherReportsTab: React.FC<TeacherReportsTabProps> = ({ students }
       </div>
       {success && (
         <div className="flex justify-end">
-          <ShareToAdminButton
-            subject={`${period} - Class ${selectedClassId} report`}
-            body={`Published midterm report summary for ${visibleStudents.length} pupils.\n${success}`}
-            className="mr-2"
-          />
           <ShareDocumentButton
             title={`${period} - Class ${selectedClassId} report`}
             text={`Published midterm report summary for ${visibleStudents.length} pupils. ${success}`}
