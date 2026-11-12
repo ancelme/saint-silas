@@ -112,7 +112,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setErrorMsg(
         errorMessage.includes('Production database configuration is missing') ||
         errorMessage.includes('API could not initialize')
-          ? 'Sign-in is temporarily unavailable. Please contact the school administrator.'
+          ? 'Sign-in is temporarily unavailable due to a system configuration issue. Please try again later.'
           : errorMessage
       );
     }
