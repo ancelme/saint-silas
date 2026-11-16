@@ -157,6 +157,12 @@ class DatabaseManager {
       await this.query(`ALTER TABLE teachers ADD COLUMN teacher_type VARCHAR(30) NOT NULL DEFAULT 'subject_teacher'`);
     }
 
+    const studentColumns = await this.query<{ name: string }>(`PRAGMA table_info(students)`);
+    if (!studentColumns.rows.some(({ name }) => name === 'user_id')) {
+      await this.query(`ALTER TABLE students ADD COLUMN user_id VARCHAR(36)`);
+      await this.query(`CREATE UNIQUE INDEX IF NOT EXISTS unique_student_user_id ON students (user_id)`);
+    }
+
     const attendanceColumns = await this.query<{ name: string }>(`PRAGMA table_info(attendance)`);
     if (!attendanceColumns.rows.some(({ name }) => name === 'subject_id')) {
       await this.query(`ALTER TABLE attendance ADD COLUMN subject_id VARCHAR(36)`);
@@ -386,6 +392,7 @@ class DatabaseManager {
       );`,
       `CREATE TABLE IF NOT EXISTS students (
         id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) UNIQUE,
         admission_number VARCHAR(50) NOT NULL UNIQUE,
         first_name VARCHAR(100) NOT NULL,
         last_name VARCHAR(100) NOT NULL,
@@ -633,6 +640,17 @@ class DatabaseManager {
 
     for (const q of tableQueries) {
       await this.query(q);
+    }
+
+    const studentColumns = await this.query<{ name: string }>(
+      `SELECT column_name AS name
+       FROM information_schema.columns
+       WHERE table_schema = current_schema() AND table_name = ?`,
+      ['students'],
+    );
+    if (!studentColumns.rows.some(({ name }) => name === 'user_id')) {
+      await this.query(`ALTER TABLE students ADD COLUMN user_id VARCHAR(36)`);
+      await this.query(`CREATE UNIQUE INDEX IF NOT EXISTS unique_student_user_id ON students (user_id)`);
     }
 
     const teacherColumns = await this.query<{ name: string }>(
