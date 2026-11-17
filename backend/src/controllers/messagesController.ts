@@ -292,6 +292,7 @@ export async function sendDirectMessage(req: AuthRequest, res: Response) {
     'application/vnd.ms-powerpoint',
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'audio/webm', 'audio/mp4', 'audio/ogg', 'audio/mpeg', 'audio/wav', 'audio/x-wav',
+    'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime',
   ]);
   if (requestedAttachments.length > 5) {
     return res.status(400).json({ error: 'You can attach up to 5 files to a message' });
@@ -333,6 +334,12 @@ export async function sendDirectMessage(req: AuthRequest, res: Response) {
   }
   if (totalAttachmentBytes > 6 * 1024 * 1024) {
     return res.status(400).json({ error: 'Attachments must total 6 MB or less per message' });
+  }
+  if (
+    cleanAttachments.some(attachment => attachment.mimeType.startsWith('video/')) &&
+    totalAttachmentBytes > 3 * 1024 * 1024
+  ) {
+    return res.status(400).json({ error: 'Video messages, including other attachments, must total 3 MB or less' });
   }
   if (requestedSubject !== undefined && (
     typeof requestedSubject !== 'string' ||

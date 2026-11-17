@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, CheckCheck, FileText, Image, LoaderCircle, MessageCircle, Mic, Minimize2, Paperclip, Plus, Search, Send, Settings2, ShieldCheck, Smile, StopCircle, Trash2, UserRound, UsersRound, Wifi, WifiOff, X } from 'lucide-react';
+import { Check, CheckCheck, FileText, Image, LoaderCircle, MessageCircle, Mic, Minimize2, Paperclip, Plus, Search, Send, Settings2, ShieldCheck, Smile, StopCircle, Trash2, UserRound, UsersRound, Video, Wifi, WifiOff, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
   ChatAttachment,
@@ -33,6 +33,7 @@ function formatMessageTime(value: string) {
 
 const MAX_ATTACHMENTS = 5;
 const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
+const MAX_VIDEO_MESSAGE_BYTES = 3 * 1024 * 1024;
 const acceptedMimeTypes = new Set([
   'image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'text/plain', 'text/csv',
   'application/msword',
@@ -42,6 +43,7 @@ const acceptedMimeTypes = new Set([
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   'audio/webm', 'audio/mp4', 'audio/ogg', 'audio/mpeg', 'audio/wav', 'audio/x-wav',
+  'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime',
 ]);
 const mimeByExtension: Record<string, string> = {
   jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
@@ -51,7 +53,8 @@ const mimeByExtension: Record<string, string> = {
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   ppt: 'application/vnd.ms-powerpoint',
   pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  webm: 'audio/webm', m4a: 'audio/mp4', ogg: 'audio/ogg', mp3: 'audio/mpeg', wav: 'audio/wav',
+  m4a: 'audio/mp4', ogg: 'audio/ogg', mp3: 'audio/mpeg', wav: 'audio/wav',
+  mp4: 'video/mp4', webm: 'video/webm', ogv: 'video/ogg', mov: 'video/quicktime',
 };
 
 function readFileAsDataUrl(file: File) {
@@ -377,7 +380,13 @@ export const ChatTab: React.FC<{
         return;
       }
       totalBytes += file.size;
-      if (totalBytes > MAX_ATTACHMENT_BYTES) {
+      const includesVideo = mimeType.startsWith('video/') || attachments.some(item => item.mimeType.startsWith('video/'))
+        || preparedFiles.some(item => item.mimeType.startsWith('video/'));
+      if (totalBytes > (includesVideo ? MAX_VIDEO_MESSAGE_BYTES : MAX_ATTACHMENT_BYTES)) {
+        if (includesVideo) {
+          setError('Video messages, including any other attachments, must total 3 MB or less. Compress the video or share a link instead.');
+          return;
+        }
         setError('Attachments must total 6 MB or less per message.');
         return;
       }
@@ -828,6 +837,11 @@ export const ChatTab: React.FC<{
                                       <a href={attachment.dataUrl} target="_blank" rel="noreferrer" aria-label={`Open image ${attachment.name}`}>
                                         <img src={attachment.dataUrl} alt={attachment.name} className="max-h-72 max-w-full rounded-xl object-contain" />
                                       </a>
+                                    ) : attachment.mimeType.startsWith('video/') ? (
+                                      <div className="max-w-sm">
+                                        <video controls preload="metadata" src={attachment.dataUrl} className="max-h-72 max-w-full rounded-xl" aria-label={attachment.name} />
+                                        <p className="mt-1 truncate text-[10px] opacity-80">{attachment.name}</p>
+                                      </div>
                                     ) : attachment.mimeType.startsWith('audio/') ? (
                                       <div className="min-w-56 max-w-full">
                                         <audio controls preload="metadata" src={attachment.dataUrl} className="max-w-full" aria-label={attachment.name} />
@@ -894,7 +908,7 @@ export const ChatTab: React.FC<{
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept="image/jpeg,image/png,image/webp,application/pdf,text/plain,text/csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,audio/*"
+                  accept="image/jpeg,image/png,image/webp,application/pdf,text/plain,text/csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,audio/*,video/mp4,video/webm,video/ogg,video/quicktime,.mp4,.webm,.ogv,.mov"
                   onChange={event => void handleFileSelection(event)}
                   className="sr-only"
                   aria-label="Attach files"
@@ -905,6 +919,8 @@ export const ChatTab: React.FC<{
                       <li key={attachment.id} className="flex max-w-full items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800">
                         {attachment.mimeType.startsWith('image/')
                           ? <Image className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+                          : attachment.mimeType.startsWith('video/')
+                            ? <Video className="h-4 w-4 shrink-0 text-violet-600" aria-hidden="true" />
                           : attachment.mimeType.startsWith('audio/')
                             ? <Mic className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
                             : <FileText className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />}
